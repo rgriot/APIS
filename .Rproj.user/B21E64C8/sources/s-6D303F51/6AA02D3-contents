@@ -1,0 +1,51 @@
+#' allFreq
+#'
+#' This function estimates allele frequencies
+#' @param genotype A matrix of genotypes (n*p)
+#' n = number of individuals
+#' p = number of markers (coded as "All1/All2", ex: "A/A" or "NA/NA" for missing genotype)
+#' @keywords allele frequencies
+#' @export A matrix of allele frequencies
+#' @examples
+#' allFreq(genotype_matrix)
+
+allFreq <- function(genotype) {
+  # DESCRIPTION
+  # Estimate allele frequencies based on genotype matrix
+
+
+  # Create the genotype matrix for new coding genotypes (2 columns)
+  mat.geno <- matrix(NA, nrow = nrow(genotype), ncol = 2*ncol(genotype))
+
+  imp <- seq(1,ncol(mat.geno),2)
+
+  # Divide each genotype (coded A/A) into 2 columns
+  for (i in c(1:ncol(genotype))) {
+    tmp <- strsplit(genotype[,i], split = '/', fixed = T)
+    M <- t(mapply(FUN = function(X) {X}, tmp))
+    mat.geno[,(imp[i]:(imp[i]+1))] <- M
+  }
+
+  # List of the different alleles
+  variant <- sort(unique(unlist(as.list(apply(mat.geno,2,unique)))))
+
+  # Create the results matrix
+  mat.res <- matrix(0, nrow = ncol(genotype), ncol = length(variant))
+  rownames(mat.res) <- colnames(genotype)
+  colnames(mat.res) <- variant
+
+  for (n in 1:nrow(mat.res)) {
+    tmp <- table(mat.geno[,(imp[n]:(imp[n]+1))])
+    mat.res[n,match(names(tmp), colnames(mat.res))] <- tmp
+  }
+
+  # Calculte the allele frequencies
+  mat.freq <- mat.res/(rowSums(mat.res[,which(colnames(mat.res)!='NA')]))
+  colnames(mat.freq) <- paste0('Freq_',colnames(mat.res))
+
+  # Merge the results
+  res <- cbind(mat.res, tot = rowSums(mat.res), mat.freq)
+
+  # Return the result
+  return(res)
+}

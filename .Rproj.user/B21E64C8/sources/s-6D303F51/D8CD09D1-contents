@@ -1,0 +1,153 @@
+#' setThreshold
+#'
+#' This function calculates the threshold for APIS
+#' @param ped.log log.like for assignment function
+#' @param ped.exclu log.exclu for assignment function
+#' @param nb.mrk Number of markers
+#' @param error (default: NULL) The assignment error rate accepted by the user
+#' @keywords assignment
+#' @export pedigree Matrix of pedigree
+#' @export log Dataframe with the log of the procedure (average Mendelian transmission probabilities, mismatches, delta, ...)
+#' @export error The assignment error rate given
+
+setThreshold <- function(ped.log, ped.exclu, nb.mrk, error = NULL) {
+
+  cat('===================================================', sep = '\n')
+  cat('           ___   _____   _   _____  ', sep = '\n')
+  cat('          /   | |  _  \\ | | /  ___/ ', sep = '\n')
+  cat('         / /| | | |_| | | | | |___  ', sep = '\n')
+  cat('        / / | | |  ___/ | | \\ __  \\ ', sep = '\n')
+  cat('       / /  | | | |     | |  ___| | ', sep = '\n')
+  cat('      /_/   |_| |_|     |_| /_____/ ', sep = '\n')
+  cat('\n')
+  cat('---------------------------------------------------', sep = '\n')
+  cat('AUTO-ADAPTIVE PARENTAGE INFERENCE SOFTWARE', sep = '\n')
+  cat('---------------------------------------------------', sep = '\n')
+
+  # Create the pedigree output
+  ped <- as.data.frame(matrix(NA, ncol = 6, nrow = nrow(ped.log)))
+  colnames(ped) <- c('off', 'sire', 'dam', 'miss', 'like', 'P_mendel')
+  ped[,1] <- ped.log[,1]
+
+  # Plot of Mendelian transmission probability distributions
+  log.mendel1 <- sort(ped.log$mendel1)
+  log.mendel2 <- sort(ped.log$mendel2)
+  max.l1 <- max(max(log.mendel1), max(log.mendel2))
+  min.l2 <- min(min(log.mendel1), min(log.mendel2))
+
+  res.graph <- matrix(NA, nrow = (nrow(ped.log)+1), ncol = 3)
+  colnames(res.graph) <- c('pos', 'P_mendel1', 'P_mendel2')
+
+  slide.win <- (max.l1 - min.l2)/20
+  it <- (max.l1 - min.l2)/nrow(ped.log)
+  pos.in <- min.l2
+  i <- 1
+
+  while(pos.in < max.l1) {
+    l.win <- pos.in + slide.win
+    cpt.log1 <- length(log.mendel1[which(log.mendel1>pos.in&log.mendel1<=l.win)])
+    cpt.log2 <- length(log.mendel2[which(log.mendel2>pos.in&log.mendel2<=l.win)])
+
+    pos <- (l.win + pos.in)/2
+    res.graph[i,] <- c(pos, cpt.log1, cpt.log2)
+
+    i <- i+1
+    pos.in <- pos.in + it
+  }
+
+  res.graph <- as.data.frame(na.omit(res.graph))
+  res.graph$sum <- res.graph$P_mendel1 + res.graph$P_mendel2
+
+  cat('\n')
+
+  plot(res.graph$pos, res.graph$P_mendel1, col = 'red', type = 'l', lty = 3,
+       xlim = sort(c(min.l2, max.l1)), ylim = c(0,max(res.graph$P_mendel2,res.graph$P_mendel1, res.graph$sum)),
+       xlab = 'Mendelian probability', ylab = 'Frequency')
+  points(res.graph$pos, res.graph$P_mendel2, col = 'blue', type = 'l', lty = 3)
+  points(res.graph$pos, res.graph$sum, col = 'black', type = 'l', lty = 1)
+  legend('topleft', legend = c('P1', 'P2', 'cumulated'), lty = c(3,3,1),
+         col = c('red', 'blue', 'black'))
+
+  if (is.null(error)) {
+    error <- as.numeric(readline(prompt = 'What assignment error rate do you accept : '))
+  } else {
+
+  }
+
+  # Calculate the median of P2m(:)
+  med_0 <- median(ped.log$mendel2)
+
+  mendel2_o <- sort(ped.log$mendel2)
+  mendel1_o <- sort(ped.log$mendel1)
+
+  N1_0 <- length(ped.log$mendel1[which(ped.log$mendel1<=med_0)])
+  N0 <- length(ped.log$mendel1)
+
+  while(TRUE) {
+    seuil <- min(ped.log$mendel2)
+
+    N2_l <- round(length(ped.log$mendel2[which(ped.log$mendel2<=seuil)]) -
+                    (length(ped.log$mendel3[which(ped.log$mendel3<=seuil)]) * ((2*N1_0)/N0)))
+
+    vu <- c()
+
+    cpt <- 1
+    while(N2_l<((N0-(2*N1_0))/2) & cpt<=nrow(ped.log)) {
+      seuil <- mendel2_o[cpt]
+
+      N2_l <- round(length(ped.log$mendel2[which(ped.log$mendel2<=seuil)]) -
+                      (length(ped.log$mendel3[which(ped.log$mendel3<=seuil)]) * ((2*N1_0)/N0)))
+
+      cpt <- cpt+1
+    }
+    med_1 <- seuil
+    N1_0 <- length(ped.log$mendel1[which(ped.log$mendel1<=med_0)])
+    N1_1 <- length(ped.log$mendel1[which(ped.log$mendel1<=med_1)])
+
+    diffN <- N1_1 - N1_0
+    if (diffN<=1) {
+      break
+    } else {
+      med_0 <- med_1
+    }
+  }
+
+  N1_1min <- length(which(ped.log$mendel1<=median(ped.log$mendel2)))
+  N1_1 <- ifelse(test = N1_1>round(nrow(ped.log)/2), yes = round(nrow(ped.log)/2), no = N1_1)
+
+  cat('Estimated number of offspring with at least one missing parent : between',2*N1_1min,'and',2*N1_1)
+  cat('\n')
+
+  #####-----------------------------------------------------
+  ##### THRESHOLD
+  #####-----------------------------------------------------
+
+  # If the number of offspring with at least one missing parent is LOWER than the user-defined error
+  if ((2*N1_1)<=round(error*nrow(ped.log))) {
+    cat('--------------------------------------', sep = '\n')
+    cat('     BEST MENDELIAN PROBABILITY', sep = '\n')
+    cat('--------------------------------------', sep = '\n')
+
+    ped[,2:6] <- ped.log[,3:7]
+    ped$assign <- 'assigne'
+
+  } else {
+  # If the number of offspring with at least one missing parent is GREATER than the user-defined error
+    cat('--------------------------------------', sep = '\n')
+    cat('    DELTA OF MENDELIAN PROBABILITY', sep = '\n')
+    cat('--------------------------------------', sep = '\n')
+
+    s.delta23 <- sort(ped.log$delta_Pmendel23, decreasing = T)
+
+    thresh.mendel <- quantile(s.delta23[1:(nrow(ped.log) - 2*N1_1min)], probs = (1-error), type = 5, na.rm = T)
+    cat('Threshold for delta :', thresh.mendel)
+    cat('\n')
+
+    ped[,2:6] <- ped.log[,c(3:7)]
+    ped$assign <- ifelse(test = ped.log$delta_Pmendel12 >= thresh.mendel, yes = 'assigne', no = 'non.assigne')
+  }
+
+
+  # Return the output
+  return(list(pedigree = ped, log = ped.log, error = error))
+}

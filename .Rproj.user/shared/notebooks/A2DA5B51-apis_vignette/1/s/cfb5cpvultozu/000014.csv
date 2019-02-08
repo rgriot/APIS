@@ -1,0 +1,4 @@
+"0","setwd(""../data/"")
+"
+"2","The working directory was changed to D:/Data_RG/package APIS/APIS/data inside a notebook chunk. The working directory will be reset when the chunk is finished running. Use the knitr root.dir option in the setup chunk to change the working directory for notebook chunks."
+"0","data_raw <- as.matrix(read.table(file = ""example_genotype_APIS.txt"", row.names = 1))"

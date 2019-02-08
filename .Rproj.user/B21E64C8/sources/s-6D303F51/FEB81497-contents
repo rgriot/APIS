@@ -1,0 +1,61 @@
+#' APIS
+#'
+#' This function performs the APIS procedure
+#' @param off.genotype Offspring genotypes | Matrix (n*p) where n = number of individuals, p = number of markers
+#' rownames(offspring) = labels of offspring
+#' marker coding = "All1/All2" example: "A/A", "A/B", "NA/NA" (for missing genotype)
+#'
+#' @param error (default: NULL) The assignment error rate accepted by the user
+#' @param exclusion.threshold (default: ncol(off.genotype)) Threshold for exclusion (number of mismatches allowed)
+#' @keywords assignment APIS
+#' @export pedigree Matrix of pedigree
+#' @export log Dataframe with the log of the procedure (average Mendelian transmission probabilities, mismatches, delta, ...)
+
+APIS <- function(off.genotype, sire.genotype, dam.genotype, error = NULL, exclusion.threshold = ncol(off.genotype)) {
+
+	# Check inputs
+
+	#	Check if all genotypes matrices have the same number of markers
+	if (ncol(off.genotype) == ncol(sire.genotype) & ncol(off.genotype) == ncol(dam.genotype) & ncol(sire.genotype) == ncol(dam.genotype)) {
+		cat("genotype matrices : OK")
+	} else {
+		stop("Your genotype matrices do not have the same number of markers")
+	}
+
+	#	Check if the number of mismatches allowed is lower than the number of markers and positive
+	if ((0 <= exclusion.threshold) && (exclusion.threshold <= ncol(off.genotype))) {
+	  cat("exclusion threshold : OK")
+	} else {
+		stop("The exclusion threshold is greater than the number of markers")
+	}
+
+	# Check if the user-defined assignment error rate limit is a percentage
+	if ((0 <= error) && (error <= 100)) {
+	  cat("assignment error rate : OK")
+	} else {
+		stop("The assignment error rate limit is NEGATIVE")
+	}
+
+	# Calculate the theoretical assignment power
+	P <- assignmentPower(sire = sire.genotype, dam = dam.genotype)
+	cat("The assignment power of your marker set is ", P)
+
+	if (P >= 0.99) {
+		next
+	} else {
+		message("WARNING! Your marker set is not enough powerfull!")
+	}
+
+	# Assign with APIS
+	assignResult 	<- assignment(off = off.genotype, sire = sire.genotype, dam = dam.genotype, thresh = exclusion.threshold)
+	apisResult 		<- setThreshold(ped.log = assignResult$log.mendel, ped.exclu = assignResult$exclu, nb.mrk = assignResult$nb.mrk, error = error)
+
+	pedigree 	<- apisResult$pedigree
+	log 		<- apisResult$log
+
+	# Give recommendations according to the data set and the results
+
+
+	# Return outputs
+	output <- list(pedigree = pedigree, log = log)
+}
