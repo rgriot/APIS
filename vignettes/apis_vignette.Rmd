@@ -22,11 +22,14 @@ This package include all the functions to assign with APIS (Griot & al., 2019).
 Parentage assignment is widely used for farmed and natural populations. As most of the likelihood software are based on simulation, the estimation of the simulation parameters is a key point for assignment reliability. Among those parameters, the proportion of missing parent is one of the most important. To avoid estimation of missing parents, we developed APIS (Auto-Adaptive Parentage Inference Software), based on observed average Mendelian transmission probabilities.
 
 # Install and load the package
-```{r, }
-# devtools::install_github("rgriot/APIS")
-require(APIS)
+```{r load_packages, include=F}
+devtools::install_github("rgriot/APIS")
+library(APIS)
 ```
-
+```{r, eval=F}
+devtools::install_github("rgriot/APIS")
+library(APIS)
+```
 # Formate your data
 APIS requires matrices of characters.
 Each matrix has individuals as rows, markers as columns. The individual labels are set as rownames. Each cell is the genotype of one marker, coded "All1/All2". For example "A/A", "A/B", "B/B" for bi-allelic markers and "NA/NA" for missing value.
@@ -75,12 +78,12 @@ APIS gives you 3 different outputs :
 Following graphs were drawn from an example dataset. The Mendelian transmission probabilities values are higher than a real-world example. However, the distribution shapes are realistic.
 
 ```{r , echo=FALSE, fig.cap="Average Mendelian transmission probability distributions calculated on 1000 offspring from 10 sires and 10 dams, genotyped on 400 markers", out.width = '100%'}
-knitr::include_graphics('D:/Data_RG/package APIS/APIS/vignettes/distrib2.png')
+knitr::include_graphics('D:/Data_RG/package_APIS/APIS/vignettes/distrib2.png')
 ```
 When all parents are present, the distribution of P1 has one mode and the distribution of P2 also has one mode
 
 ```{r , echo=FALSE, fig.cap="Average Mendelian transmission probability distributions calculated on 1000 offspring from 5 sires (+ 5 sires missing) and 10 dams, genotyped on 400 markers", out.width = '100%'}
-knitr::include_graphics('D:/Data_RG/package APIS/APIS/vignettes/distrib1.png')
+knitr::include_graphics('D:/Data_RG/package_APIS/APIS/vignettes/distrib1.png')
 ```
 When all parents are missing, the distribution of P1 has two modes :
 
