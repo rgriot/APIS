@@ -18,9 +18,8 @@ allele frequencies
 This function estimates allele frequencies
 }
 \examples{
-data <- as.matrix(read.table(file = "example_genotype_APIS.txt", row.names = 1))
-off.genotype <- data[which(rownames(data) \%in\% c(21:1020)),]
-freq <- allFreq(off.genotype)
+data("genotype_APIS")
+freq <- allFreq(off)
 }
 \keyword{allele}
 \keyword{frequencies}

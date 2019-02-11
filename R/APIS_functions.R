@@ -21,17 +21,12 @@
 #' @keywords assignment APIS
 #' @return pedigree
 #' @return a log file
-#' @examples data <- as.matrix(read.table(file = "example_genotype_APIS.txt", row.names = 1))
+#' @examples data("genotype_APIS")
 #'
-#' off.genotype <- data[which(rownames(data) %in% c(21:1020)),]
-#' sire.genotype <- data[which(rownames(data) %in% c(1:10)),]
-#' dam.genotype <- data[which(rownames(data) %in% c(11:20)),]
-#' error <- 0.05 #I accept 5% of errors in the results
-#'
-#' result <- APIS(off.genotype = off.genotype,
-#'                sire.genotype = sire.genotype,
-#'                dam.genotype = dam.genotype,
-#'                error = error)
+#' result <- APIS(off.genotype = off,
+#'                sire.genotype = sire,
+#'                dam.genotype = dam,
+#'                error = 0.05)
 #' @export
 APIS <- function(off.genotype, sire.genotype, dam.genotype, error = NULL, exclusion.threshold = ncol(off.genotype)) {
 
@@ -572,9 +567,8 @@ setThreshold <- function(ped.log, ped.exclu, nb.mrk, error = NULL) {
 #' n = number of individuals
 #' p = number of markers (coded as "All1/All2", ex: "A/A" or "NA/NA" for missing genotype)
 #' @keywords allele frequencies
-#' @examples data <- as.matrix(read.table(file = "example_genotype_APIS.txt", row.names = 1))
-#' off.genotype <- data[which(rownames(data) %in% c(21:1020)),]
-#' freq <- allFreq(off.genotype)
+#' @examples data("genotype_APIS")
+#' freq <- allFreq(off)
 #' @return allele frequencies
 #' @export
 allFreq <- function(genotype) {
@@ -629,6 +623,8 @@ allFreq <- function(genotype) {
 #' rownames(dam) = labels of dams
 #' marker coding = "All1/All2" example: "A/A", "A/B", "NA/NA" (for missing genotype)
 #' @return Theoretical assignment power of the marker set
+#' @examples data("genotype_APIS")
+#' assignmentPower(sire, dam)
 #' @keywords assignment exclusion power
 #' @export
 assignmentPower <- function(sire, dam) {

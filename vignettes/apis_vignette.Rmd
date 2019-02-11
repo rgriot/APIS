@@ -1,12 +1,13 @@
 ---
-title: "APIS: An Auto-Adaptive Parentage Inference Software tolerant to missing parents"
+title: 'APIS: An Auto-Adaptive Parentage Inference Software tolerant to missing parents'
 author: "Ronan GRIOT"
 date: "`r Sys.Date()`"
-output: rmarkdown::html_vignette
-vignette: >
-  %\VignetteIndexEntry{Vignette Title}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+vignette: |
+  %\VignetteIndexEntry{Vignette Title} %\VignetteEngine{knitr::rmarkdown} %\VignetteEncoding{UTF-8}
 ---
 
 ```{r setup, include = FALSE}
@@ -31,20 +32,10 @@ APIS requires matrices of characters.
 Each matrix has individuals as rows, markers as columns. The individual labels are set as rownames. Each cell is the genotype of one marker, coded "All1/All2". For example "A/A", "A/B", "B/B" for bi-allelic markers and "NA/NA" for missing value.
 
 ```{r}
-setwd("../data/")
-data_raw <- as.matrix(read.table(file = "example_genotype_raw.txt", row.names = 1))
+data("genotype_APIS")
 
-head(data_raw[,1:10])
-
-data <- data_raw
-
-data[data == 0]   <- "A/A"
-data[data == 1]   <- "A/B"
-data[data == 2]   <- "B/B"
-data[data == -9]  <- "NA/NA"
-
-head(data[,1:10])
-rownames(data[1:6,])
+head(off[,1:10])
+rownames(off[1:6,])
 ```
 
 # Prepare the inputs
@@ -59,9 +50,6 @@ APIS main function requires 4 inputs :
   * error = accepted assignment error rate (What is the maximum error rate I accept in my assignment results ?)
 
 ```{r}
-off.genotype <- data[which(rownames(data) %in% c(21:1020)),]
-sire.genotype <- data[which(rownames(data) %in% c(1:10)),]
-dam.genotype <- data[which(rownames(data) %in% c(11:20)),]
 error <- 0.05 #I accept 5% of errors in the results
 ```
 

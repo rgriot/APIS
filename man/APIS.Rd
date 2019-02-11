@@ -39,17 +39,12 @@ a log file
 This function performs the APIS procedure
 }
 \examples{
-data <- as.matrix(read.table(file = "example_genotype_APIS.txt", row.names = 1))
+data("genotype_APIS")
 
-off.genotype <- data[which(rownames(data) \%in\% c(21:1020)),]
-sire.genotype <- data[which(rownames(data) \%in\% c(1:10)),]
-dam.genotype <- data[which(rownames(data) \%in\% c(11:20)),]
-error <- 0.05 #I accept 5\% of errors in the results
-
-result <- APIS(off.genotype = off.genotype,
-               sire.genotype = sire.genotype,
-               dam.genotype = dam.genotype,
-               error = error)
+result <- APIS(off.genotype = off,
+               sire.genotype = sire,
+               dam.genotype = dam,
+               error = 0.05)
 }
 \keyword{APIS}
 \keyword{assignment}
