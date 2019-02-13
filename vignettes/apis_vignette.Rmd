@@ -37,8 +37,8 @@ Each matrix has individuals as rows, markers as columns. The individual labels a
 ```{r}
 data("genotype_APIS")
 
-head(off[,1:10])
-rownames(off[1:6,])
+head(off_full[,1:10])
+rownames(off_full[1:6,])
 ```
 
 # Prepare the inputs
@@ -57,13 +57,13 @@ error <- 0.05 #I accept 5% of errors in the results
 ```
 
 # Running the assignment
-The main function to perform parentage assignment with APis the "APIS" function
+The main function to perform parentage assignment with APIS the "APIS" function
 
-```{r}
-# result <- APIS(off.genotype = off.genotype,
-#                sire.genotype = sire.genotype,
-#                dam.genotype = dam.genotype,
-#                error = error)
+```{r, eval = F}
+result <- APIS(off.genotype = off_full,
+               sire.genotype = sire_full,
+               dam.genotype = dam_full,
+               error = error)
 ```
 
 # Analyse the results
@@ -75,23 +75,71 @@ APIS gives you 3 different outputs :
   
   * graphs
 
-Following graphs were drawn from an example dataset. The Mendelian transmission probabilities values are higher than a real-world example. However, the distribution shapes are realistic.
+According to the graphs, you can change the thresholds to improve your assignment.
 
-```{r , echo=FALSE, fig.cap="Average Mendelian transmission probability distributions calculated on 1000 offspring from 10 sires and 10 dams, genotyped on 400 markers", out.width = '100%'}
-knitr::include_graphics('D:/Data_RG/package_APIS/APIS/vignettes/distrib2.png')
+If you want to set up your threshold on Mendelian probabilities, use :
+
+```{r, eval = F}
+new.result <- personalThreshold(APIS.result = result,
+                                method = 'Pmendel',
+                                threshold = 0.7)
 ```
-When all parents are present, the distribution of P1 has one mode and the distribution of P2 also has one mode
 
-```{r , echo=FALSE, fig.cap="Average Mendelian transmission probability distributions calculated on 1000 offspring from 5 sires (+ 5 sires missing) and 10 dams, genotyped on 400 markers", out.width = '100%'}
-knitr::include_graphics('D:/Data_RG/package_APIS/APIS/vignettes/distrib1.png')
+If you want to set up your threshold on mismatches, use :
+
+```{r, eval = F}
+new.result <- personalThreshold(APIS.result = result,
+                                method = 'exclusion',
+                                threshold = 5)
 ```
-When all parents are missing, the distribution of P1 has two modes :
 
-  * The one with the highest values representing offspring with both parents present
-  
-  * The one with the lowest values, under the P2 distribution, representing the offspring with missing pareny
+# Examples
+## Full data
+This example use the full data provided by the package.
 
-and the distribution of P2 also has one mode.
+```{r, eval = F}
+data("genotype_APIS")
+result <- APIS(off.genotype = off_full,
+               sire.genotype = sire_full,
+               dam.genotype = dam_full,
+               error = 0.05)
+```
+```{r , echo=FALSE, fig.cap="APIS outputs calculated on 1000 offspring from 10 sires and 10 dams, genotyped on 400 markers", out.width = '100%'}
+knitr::include_graphics('D:/Data_RG/package_APIS/APIS/vignettes/fulldata_APIS.png')
+```
+
+When I look at the mismatch distributions, I prefer to use exclusion and allow for 5 mismatches
+
+```{r, eval = F}
+new.result <- personalThreshold(APIS.result = result,
+                                method = 'exclusion',
+                                threshold = 5)
+```
+```{r , echo=FALSE, fig.cap="APIS outputs based on mismatches calculated on 1000 offspring from 10 sires and 10 dams, genotyped on 400 markers", out.width = '100%'}
+knitr::include_graphics('D:/Data_RG/package_APIS/APIS/vignettes/fulldata_mismatch.png')
+```
+
+## Degraded data
+This example use the degraded data provided by the package.
+
+```{r, eval = F}
+data("genotype_APIS")
+result <- APIS(off.genotype = off_degraded,
+               sire.genotype = sire_degraded,
+               dam.genotype = dam_degraded,
+               error = 0.05)
+```
+```{r , echo=FALSE, fig.cap="APIS outputs calculated on 1000 offspring from 5 sires (5 missing sires) and 10 dams, genotyped on 50 markers", out.width = '100%'}
+knitr::include_graphics('D:/Data_RG/package_APIS/APIS/vignettes/degradeddata_APIS.png')
+```
+
+In this situation, the theoretical assignment power is low and there are missing parents.
+The distribution graphs do not give you more information about a new threshold value.
+
+Thus, the better answer is to keep APIS results.
+
+# Acknowlegments
+This work was partially financially supported in the GeneSea project (n° R FEA 4700 16 FA 100 0005) by the French Government and the European Union (EMFF, European Maritime and Fisheries Fund) at the "Appels à projets Innovants" managed by the FranceAgrimer Office. The doctoral scholarship of Ronan Griot was partially supported by the ANRT (doctoral scholarship n° 2017/0731) and SYSAAF.
 
 # Annexe
 

@@ -86,7 +86,8 @@ APIS <- function(off.genotype, sire.genotype, dam.genotype, error = NULL, exclus
   cat('Assignment error rate accepted : ', error)
   cat('\n')
   assignmentRate <- length(pedigree$sire[which(pedigree$sire != '0')]) / nrow(pedigree)
-  cat('Assignment rate : ', assignmentRate)
+  AR <- substr(as.character(100 * assignmentRate), 1, 6)
+  cat('Assignment rate : ', AR, '%', sep = "")
   cat('\n')
 
   # Return outputs
