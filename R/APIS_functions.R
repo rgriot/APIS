@@ -23,9 +23,9 @@
 #' @return a log file
 #' @examples data("genotype_APIS")
 #'
-#' result <- APIS(off.genotype = off,
-#'                sire.genotype = sire,
-#'                dam.genotype = dam,
+#' result <- APIS(off.genotype = off_full,
+#'                sire.genotype = sire_full,
+#'                dam.genotype = dam_full,
 #'                error = 0.05)
 #' @export
 APIS <- function(off.genotype, sire.genotype, dam.genotype, error = NULL, exclusion.threshold = ncol(off.genotype)) {
@@ -650,7 +650,7 @@ allFreq <- function(genotype) {
 #' marker coding = "All1/All2" example: "A/A", "A/B", "NA/NA" (for missing genotype)
 #' @return Theoretical assignment power of the marker set
 #' @examples data("genotype_APIS")
-#' assignmentPower(sire, dam)
+#' assignmentPower(sire_full, dam_full)
 #' @keywords assignment exclusion power
 #' @export
 assignmentPower <- function(sire, dam) {
@@ -701,9 +701,9 @@ assignmentPower <- function(sire, dam) {
 #' @return new pedigree from the new threshold
 #' @examples data("genotype_APIS")
 #'
-#' result <- APIS(off.genotype = off,
-#'                sire.genotype = sire,
-#'                dam.genotype = dam,
+#' result <- APIS(off.genotype = off_full,
+#'                sire.genotype = sire_full,
+#'                dam.genotype = dam_full,
 #'                error = 0.05)
 #'
 #' new.result <- personalThreshold(result, method = 'Pmendel')

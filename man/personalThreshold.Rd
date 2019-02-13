@@ -23,9 +23,9 @@ This function allows the user to set up his own threshold
 \examples{
 data("genotype_APIS")
 
-result <- APIS(off.genotype = off,
-               sire.genotype = sire,
-               dam.genotype = dam,
+result <- APIS(off.genotype = off_full,
+               sire.genotype = sire_full,
+               dam.genotype = dam_full,
                error = 0.05)
 
 new.result <- personalThreshold(result, method = 'Pmendel')

@@ -23,7 +23,7 @@ This function calculates the theoretical assignment power of the marker set
 }
 \examples{
 data("genotype_APIS")
-assignmentPower(sire, dam)
+assignmentPower(sire_full, dam_full)
 }
 \keyword{assignment}
 \keyword{exclusion}
