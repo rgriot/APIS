@@ -11,8 +11,8 @@ License: GPL
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 6.1.1
-Depends: doParallel, foreach
-Imports: doParallel, foreach
+Depends: doSNOW, foreach, ggplot2, gridExtra
+Imports: doSNOW, foreach, ggplot2, gridExtra
 Suggests: 
     knitr,
     rmarkdown

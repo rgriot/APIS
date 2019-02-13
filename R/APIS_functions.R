@@ -59,7 +59,8 @@ APIS <- function(off.genotype, sire.genotype, dam.genotype, error = NULL, exclus
 
   # Calculate the theoretical assignment power
   P <- assignmentPower(sire = sire.genotype, dam = dam.genotype)
-  cat("The assignment power of your marker set is ", P)
+  P2 <- substr(as.character(100 * P), 1, 6)
+  cat("The assignment power of your marker set is ", P2, "%", sep = "")
   cat('\n')
 
   if (P >= 0.99) {
@@ -74,13 +75,22 @@ APIS <- function(off.genotype, sire.genotype, dam.genotype, error = NULL, exclus
   apisResult 		<- setThreshold(ped.log = assignResult$log.mendel, ped.exclu = assignResult$exclu, nb.mrk = assignResult$nb.mrk, error = error)
 
   pedigree 	<- apisResult$pedigree
-  log 		<- apisResult$log
+  log 		  <- apisResult$log
 
   # Give recommendations according to the data set and the results
-
+  cat('--------------------------------------', sep = '\n')
+  cat('             APIS SUMMARY', sep = '\n')
+  cat('--------------------------------------', sep = '\n')
+  cat('Theoretical assignment power of the marker set : ', P2, "%", sep = "")
+  cat('\n')
+  cat('Assignment error rate accepted : ', error)
+  cat('\n')
+  assignmentRate <- length(pedigree$sire[which(pedigree$sire != '0')]) / nrow(pedigree)
+  cat('Assignment rate : ', assignmentRate)
+  cat('\n')
 
   # Return outputs
-  output <- list(pedigree = pedigree, log = log)
+  output <- list(pedigree = pedigree, log = log, error = error)
 }
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -111,14 +121,10 @@ assignment <- function(offspring, sire, dam, thresh = ncol(offspring)) {
     stop('Genotypes must have the same number of markers')
 
   # Create the results matrix
-  ped <- matrix(NA, nrow = nrow(offspring), ncol = 7)
-  colnames(ped) <- c('off', 'sire1', 'dam1', 'nb_exclu1', 'log_like1', 'P_mendel1', 'assign')
-  ped[,1] <- rownames(offspring)
-
-  ped.log <- as.data.frame(matrix(NA,nrow = nrow(offspring), ncol = 21))
-  colnames(ped.log) <- c('off', 'mrk_genotype','sire1', 'dam1', 'miss1', 'like1', 'mendel1',
-                         'sire2', 'dam2', 'miss2', 'like2', 'mendel2', 'delta_like12', 'delta_Pmendel12',
-                         'sire3', 'dam3', 'miss3', 'like3', 'mendel3', 'delta_like23', 'delta_Pmendel23')
+  ped.log <- as.data.frame(matrix(NA,nrow = nrow(offspring), ncol = 16))
+  colnames(ped.log) <- c('off', 'mrk_genotype','sire1', 'dam1', 'miss1', 'mendel1',
+                         'sire2', 'dam2', 'miss2', 'mendel2', 'delta_Pmendel12',
+                         'sire3', 'dam3', 'miss3', 'mendel3', 'delta_Pmendel23')
   ped.log[,1] <- rownames(offspring)
   ped.log[,2] <- as.numeric(apply(offspring,1, function(X) {length(X[X!='NA/NA'])}))
 
@@ -160,16 +166,25 @@ assignment <- function(offspring, sire, dam, thresh = ncol(offspring)) {
 
   # Set up the cluster for parallel iteration
   cl <- makeCluster(detectCores()-1)
-  registerDoParallel(cl)
+  # registerDoParallel(cl)
+  registerDoSNOW(cl)
+
+  iterations <- nrow(offspring)
+  pb <- txtProgressBar(min = 0, max = iterations, char = "><(((°> ", style = 3)
+
+  progress <- function(n) {setTxtProgressBar(pb, n)}
+
+  opts <- list(progress = progress)
 
   # Start
-  A <- foreach(off=1:nrow(offspring), .multicombine = T,
-               .packages = c('foreach', 'doParallel')) %dopar% { # For each offspring
+  A <- foreach(off=1:iterations, .multicombine = T,
+               .packages = c('foreach', 'doParallel'), .options.snow = opts) %dopar% { # For each offspring
+
                  tmp <- offspring[off,, drop = F]
 
                  # Create temporary results
-                 res <- matrix(NA, nrow = (nrow(sire)*nrow(dam)), ncol = 5)
-                 colnames(res) <- c('sire', 'dam', 'score_exclu', 'score_like', 'P_mendel')
+                 res <- matrix(NA, nrow = (nrow(sire)*nrow(dam)), ncol = 4)
+                 colnames(res) <- c('sire', 'dam', 'score_exclu', 'P_mendel')
                  res[,1] <- rep(rownames(sire), each = nrow(dam))
                  res[,2] <- rep(rownames(dam), times = nrow(sire))
 
@@ -316,53 +331,43 @@ assignment <- function(offspring, sire, dam, thresh = ncol(offspring)) {
                                 }
 
                                 # Create the parallel loop output
-                                r <- c(NA,NA,NA)
+                                r <- c(NA,NA)
                                 r[1] <- sum(sc_exclu) # Number of missmatch
-                                r[2] <- sum(log(sc_like)) # Log likelihood
-                                r[3] <- exp(sum(log(sc_like))/ped.log[off,2]) # Mendelian transimission probability
+                                r[2] <- exp(sum(log(sc_like))/ped.log[off,2]) # Mendelian transimission probability
 
                                 return(r)
                               }
 
-                 # Working of the results
-                 res[,3:5] <- t
+                 # Working on the results
+                 res[,3:4] <- t
                  res <- as.data.frame(res)
                  res$sire <- as.character(res$sire)
                  res$dam <- as.character(res$dam)
                  res$score_exclu <- as.numeric(as.character(res$score_exclu))
-                 res$score_like <- as.numeric(as.character(res$score_like))
                  res$P_mendel <- as.numeric(as.character(res$P_mendel))
 
                  # Order by Mendelian transmission probabilities
-                 res2 <- res[order(res[,5], res[,3], decreasing = T),]
-                 res2 <- res2[which(res2$P_mendel!=-Inf),]
+                 res2 <- res[order(res[,4], res[,3], decreasing = T),]
 
-                 delta_log12 <- res2[1,4]-res2[2,4]
-                 delta_log23 <- res2[2,4]-res2[3,4]
-
-                 delta_P12 <- res2[1,5]-res2[2,5]
-                 delta_P23 <- res2[2,5]-res2[3,5]
+                 delta_P12 <- res2[1,4]-res2[2,4]
+                 delta_P23 <- res2[2,4]-res2[3,4]
 
                  p_fin <- res2[1,1]
                  m_fin <- res2[1,2]
 
-                 ped.out <- c(rownames(tmp),NA,NA,NA,NA,NA)
+                 ped.out <- c(rownames(tmp), NA, NA)
                  if (is.na(p_fin)&is.na(m_fin)) {
-                   ped.out[2:3] <- c('no_match', 'no_match')
-                   ped.out[4:6] <- c(NA, NA, NA)
+                   ped.out[2:3] <- c(NA, NA)
                  } else {
                    ped.out[2:3] <- c(p_fin,m_fin)
-                   nb_exclu <- res2[which(res2$sire==p_fin&res2$dam==m_fin),3]
-                   ped.out[4:6] <- c(nb_exclu, res2[1,4], res2[1,5])
                  }
 
-                 log.out <- unlist(c(ped.out[1], ped.log[off,2],ped.out[2:6], res2[2,1:5], delta_log12, delta_P12, res2[3,1:5], delta_log23, delta_P23))
-
-                 cat("\r", off, "on", nrow(offspring))
+                 log.out <- unlist(c(ped.out[1], ped.log[off,2], ped.out[2:3], res2[1, 3:4],
+                                     res2[2,1:4], delta_P12,
+                                     res2[3,1:4], delta_P23))
 
                  # Order by mismatches
                  res2 <- res[order(res[,3], -res[,4], decreasing = F),]
-                 res2 <- res2[which(res2$score_like!=-Inf),]
 
 
                  exclu.out <- unlist(c(log.out[1],ped.log[off,2], res2[1,1:3], res2[2,1:3], res2[3,1:3]))
@@ -371,28 +376,27 @@ assignment <- function(offspring, sire, dam, thresh = ncol(offspring)) {
                }
 
   # Stop the parallel cluster
+  close(pb)
   stopCluster(cl)
 
   ped <- as.data.frame(t(as.data.frame(lapply(A, function(X) {t <- X[[1]]}))))
-  colnames(ped) <- c('off', 'sire1', 'dam1', 'nb_exclu1', 'log_like1', 'P_mendel1')
+  colnames(ped) <- c('off', 'sire', 'dam')
   rownames(ped) <- c(1:nrow(ped))
 
   # Working on the data
   ped$off <- as.character(ped$off)
-  ped$sire1 <- as.character(ped$sire1)
-  ped$dam1 <- as.character(ped$dam1)
-  ped$nb_exclu1 <- as.numeric(as.character(ped$nb_exclu1))
-  ped$log_like1 <- as.numeric(as.character(ped$log_like1))
-  ped$P_mendel1 <- as.numeric(as.character(ped$P_mendel1))
+  ped$sire <- as.character(ped$sire)
+  ped$dam <- as.character(ped$dam)
 
   # Create a log
   ped.log <- as.data.frame(t(as.data.frame(lapply(A, function(X) {t <- X[[2]]}))))
-  colnames(ped.log) <- c('off', 'mrk_genotype','sire1', 'dam1', 'miss1', 'like1', 'mendel1',
-                         'sire2', 'dam2', 'miss2', 'like2', 'mendel2', 'delta_like12', 'delta_Pmendel12',
-                         'sire3', 'dam3', 'miss3', 'like3', 'mendel3', 'delta_like23', 'delta_Pmendel23')
+  colnames(ped.log) <- c('off', 'mrk_genotype','sire1', 'dam1', 'miss1', 'mendel1',
+                         'sire2', 'dam2', 'miss2', 'mendel2', 'delta_Pmendel12',
+                         'sire3', 'dam3', 'miss3', 'mendel3', 'delta_Pmendel23')
   rownames(ped.log) <- c(1:nrow(ped.log))
+
   ped.log[,] <- sapply(ped.log[,c(1:ncol(ped.log))], as.character)
-  ped.log[,c(2,5:7,10:14, 17:21)] <- sapply(ped.log[,c(2,5:7,10:14, 17:21)], as.numeric)
+  ped.log[,c(2, 5:6, 9:11, 14:16)] <- sapply(ped.log[,c(2, 5:6, 9:11, 14:16)], as.numeric)
 
   # Create a data frame from results by exclusion
   ped.exclu <- as.data.frame(t(as.data.frame(lapply(A, function(X) {t <- X[[3]]}))))
@@ -433,52 +437,36 @@ setThreshold <- function(ped.log, ped.exclu, nb.mrk, error = NULL) {
   cat('---------------------------------------------------', sep = '\n')
 
   # Create the pedigree output
-  ped <- as.data.frame(matrix(NA, ncol = 6, nrow = nrow(ped.log)))
-  colnames(ped) <- c('off', 'sire', 'dam', 'miss', 'like', 'P_mendel')
+  ped <- as.data.frame(matrix(NA, ncol = 3, nrow = nrow(ped.log)))
+  colnames(ped) <- c('off', 'sire', 'dam')
   ped[,1] <- ped.log[,1]
 
   # Plot of Mendelian transmission probability distributions
-  log.mendel1 <- sort(ped.log$mendel1)
-  log.mendel2 <- sort(ped.log$mendel2)
-  max.l1 <- max(max(log.mendel1), max(log.mendel2))
-  min.l2 <- min(min(log.mendel1), min(log.mendel2))
+  mendel <- rep(NA, times = 2*nrow(ped.log))
+  mendel[seq(1, length(mendel), 2)] <- ped.log$mendel1
+  mendel[seq(2, length(mendel), 2)] <- ped.log$mendel2
 
-  res.graph <- matrix(NA, nrow = (nrow(ped.log)+1), ncol = 3)
-  colnames(res.graph) <- c('pos', 'P_mendel1', 'P_mendel2')
+  data.mendel <- data.frame(mendel = mendel,
+                            P = rep(c("P1", "P2"), times = nrow(ped.log)))
 
-  slide.win <- (max.l1 - min.l2)/20
-  it <- (max.l1 - min.l2)/nrow(ped.log)
-  pos.in <- min.l2
-  i <- 1
+  delta <- rep(NA, times = 2*nrow(ped.log))
+  delta[seq(1, length(delta), 2)] <- ped.log$delta_Pmendel12
+  delta[seq(2, length(delta), 2)] <- ped.log$delta_Pmendel23
 
-  while(pos.in < max.l1) {
-    l.win <- pos.in + slide.win
-    cpt.log1 <- length(log.mendel1[which(log.mendel1>pos.in&log.mendel1<=l.win)])
-    cpt.log2 <- length(log.mendel2[which(log.mendel2>pos.in&log.mendel2<=l.win)])
+  data.delta <- data.frame(delta = delta,
+                            P = rep(c("delta1", "delta2"), times = nrow(ped.log)))
 
-    pos <- (l.win + pos.in)/2
-    res.graph[i,] <- c(pos, cpt.log1, cpt.log2)
+  miss <- rep(NA, times = 2*nrow(ped.log))
+  miss[seq(1, length(miss), 2)] <- ped.log$miss1
+  miss[seq(2, length(miss), 2)] <- ped.log$miss2
 
-    i <- i+1
-    pos.in <- pos.in + it
-  }
-
-  res.graph <- as.data.frame(na.omit(res.graph))
-  res.graph$sum <- res.graph$P_mendel1 + res.graph$P_mendel2
-
-  cat('\n')
-
-  plot(res.graph$pos, res.graph$P_mendel1, col = 'red', type = 'l', lty = 3,
-       xlim = sort(c(min.l2, max.l1)), ylim = c(0,max(res.graph$P_mendel2,res.graph$P_mendel1, res.graph$sum)),
-       xlab = 'Mendelian probability', ylab = 'Frequency')
-  points(res.graph$pos, res.graph$P_mendel2, col = 'blue', type = 'l', lty = 3)
-  legend('topleft', legend = c('P1', 'P2'), lty = c(3,3),
-         col = c('red', 'blue'))
+  data.miss <- data.frame(miss = miss,
+                           P = rep(c("miss1", "miss2"), times = nrow(ped.log)))
 
   if (is.null(error)) {
     error <- as.numeric(readline(prompt = 'What assignment error rate do you accept : '))
   } else {
-
+    error <- error
   }
 
   # Calculate the median of P2m(:)
@@ -535,8 +523,10 @@ setThreshold <- function(ped.log, ped.exclu, nb.mrk, error = NULL) {
     cat('     BEST MENDELIAN PROBABILITY', sep = '\n')
     cat('--------------------------------------', sep = '\n')
 
-    ped[,2:6] <- ped.log[,3:7]
-    ped$assign <- 'assigne'
+    ped[,2:3] <- ped.log[,3:4]
+    ped$assign <- 'assign'
+
+    thresh.mendel <- min(ped.log$delta_Pmendel12)
 
   } else {
     # If the number of offspring with at least one missing parent is GREATER than the user-defined error
@@ -550,13 +540,48 @@ setThreshold <- function(ped.log, ped.exclu, nb.mrk, error = NULL) {
     cat('Threshold for delta :', thresh.mendel)
     cat('\n')
 
-    ped[,2:6] <- ped.log[,c(3:7)]
-    ped$assign <- ifelse(test = ped.log$delta_Pmendel12 >= thresh.mendel, yes = 'assigne', no = 'non.assigne')
+    ped[,2:3] <- ped.log[,c(3:4)]
+    ped$assign <- ifelse(test = ped.log$delta_Pmendel12 >= thresh.mendel, yes = 'assign', no = 'no.assign')
   }
 
+  # Reformate outputs
+  ped.final <- ped
+  ped.final[which(ped.final$assign == 'no.assign'), 2:3] <- c(NA, NA)
+  ped.final <- ped.final[,-4]
+
+  # Plot the distributions
+  plot_mendel <- ggplot(data = data.mendel, aes(x = mendel, fill = P)) +
+    geom_histogram(data = subset(data.mendel, P == 'P2'), bins = 30) +
+    geom_histogram(data = subset(data.mendel, P == 'P1'), alpha = 0.8, bins = 30) +
+    xlab(label = "average Mendelian tranmission probability") +
+    ylab(label = "number of individuals") +
+    theme(axis.title.x = element_text(margin = margin(20, 0, 0, 0))) +
+    theme(axis.title.y = element_text(margin = margin(0, 20, 0, 0))) +
+    guides(fill = guide_legend(title = "Mendelian probability"))
+
+  plot_delta <- ggplot(data = data.delta, aes(x = delta, fill = P)) +
+    geom_histogram(data = subset(data.delta, P == 'delta2'), bins = 30) +
+    geom_histogram(data = subset(data.delta, P == 'delta1'), alpha = 0.8, bins = 30) +
+    geom_vline(xintercept = thresh.mendel) +
+    xlab(label = "delta") +
+    ylab(label = "number of individuals") +
+    theme(axis.title.x = element_text(margin = margin(20, 0, 0, 0))) +
+    theme(axis.title.y = element_text(margin = margin(0, 20, 0, 0))) +
+    guides(fill = guide_legend(title = "Delta"))
+
+  plot_miss <- ggplot(data = data.miss, aes(x = miss, fill = P)) +
+    geom_histogram(data = subset(data.miss, P == 'miss2'), bins = 30) +
+    geom_histogram(data = subset(data.miss, P == 'miss1'), alpha = 0.8, bins = 30) +
+    xlab(label = "number of mismatches") +
+    ylab(label = "number of individuals") +
+    theme(axis.title.x = element_text(margin = margin(20, 0, 0, 0))) +
+    theme(axis.title.y = element_text(margin = margin(0, 20, 0, 0))) +
+    guides(fill = guide_legend(title = "missmatches"))
+
+  grid.arrange(plot_delta, plot_mendel, plot_miss, nrow = 3, ncol = 1)
 
   # Return the output
-  return(list(pedigree = ped, log = ped.log, error = error))
+  return(list(pedigree = ped.final, log = ped.log, error = error))
 }
 
 # -------------------------------------------------------------------------------------------------------------------
@@ -662,4 +687,145 @@ assignmentPower <- function(sire, dam) {
 
   # Return the result
   return(Pu)
+}
+
+# ------------------------------------------------------------------------------------------------------------------
+#' Establish personal threshold
+#'
+#' This function allows the user to set up his own threshold
+#' @param APIS.result APIS function output
+#' @param method the method for the new threshold | 'delta' for deltas,
+#' 'Pmendel' for Mendelian porbabilities, 'exclusion' for mismatches
+#' @param threshold personal threshold | default values are implemented
+#' @return new pedigree from the new threshold
+#' @examples data("genotype_APIS")
+#'
+#' result <- APIS(off.genotype = off,
+#'                sire.genotype = sire,
+#'                dam.genotype = dam,
+#'                error = 0.05)
+#'
+#' new.result <- personalThreshold(result, method = 'Pmendel')
+#' @keywords assignment APIS threshold
+#' @export
+personalThreshold <- function(APIS.result, method, threshold = NULL) {
+  # Get the result
+  pedigree <- APIS.result$pedigree
+  log <- APIS.result$log
+  error <- APIS.result$error
+
+  # Check the method
+  if (method == "delta") {
+    # DO the delta threshold
+    col_toKeep <- 14
+    if (is.null(threshold)) {
+      return(APIS.result)
+    } else {
+      threshold <- threshold
+    }
+  } else if (method == "Pmendel") {
+    # DO the Pmendel threshold
+    col_toKeep <- 7
+    if (is.null(threshold)) {
+      threshold <- quantile(x = log[,12], probs = (1 - error), type = 5)
+    } else {
+      threshold <- threshold
+    }
+  } else if (method == "exclusion") {
+    # DO the exclusion threshold
+    col_toKeep <- 5
+    if (is.null(threshold)) {
+      threshold <- ceiling(0.05 * max(log$mrk_genotype))
+    } else {
+      threshold <- threshold
+    }
+  } else {
+    stop("Invalid method")
+  }
+
+  # Re-assgin the offspring
+  tmp <- log[,c(1,3:4)]
+
+  if (method == 'exclusion') {
+    tmp$assign <- ifelse(test = log[,col_toKeep] <= threshold, yes = 'assign', no = 'no.assign')
+  } else {
+    tmp$assign <- ifelse(test = log[,col_toKeep] >= threshold, yes = 'assign', no = 'no.assign')
+  }
+
+  tmp[which(tmp$assign == 'no.assign'), 2:3] <- c(NA, NA)
+  pedigree <- tmp[,1:3]
+
+  # Plot results
+  mendel <- rep(NA, times = 2*nrow(log))
+  mendel[seq(1, length(mendel), 2)] <- log$mendel1
+  mendel[seq(2, length(mendel), 2)] <- log$mendel2
+
+  data.mendel <- data.frame(mendel = mendel,
+                            P = rep(c("P1", "P2"), times = nrow(log)))
+
+  delta <- rep(NA, times = 2*nrow(log))
+  delta[seq(1, length(delta), 2)] <- log$delta_Pmendel12
+  delta[seq(2, length(delta), 2)] <- log$delta_Pmendel23
+
+  data.delta <- data.frame(delta = delta,
+                           P = rep(c("delta1", "delta2"), times = nrow(log)))
+
+  miss <- rep(NA, times = 2*nrow(log))
+  miss[seq(1, length(miss), 2)] <- log$miss1
+  miss[seq(2, length(miss), 2)] <- log$miss2
+
+  data.miss <- data.frame(miss = miss,
+                          P = rep(c("miss1", "miss2"), times = nrow(log)))
+
+  plot_mendel <- ggplot(data = data.mendel, aes(x = mendel, fill = P)) +
+    geom_histogram(data = subset(data.mendel, P == 'P2'), bins = 30) +
+    geom_histogram(data = subset(data.mendel, P == 'P1'), alpha = 0.8, bins = 30) +
+    xlab(label = "average Mendelian tranmission probability") +
+    ylab(label = "number of individuals") +
+    theme(axis.title.x = element_text(margin = margin(20, 0, 0, 0))) +
+    theme(axis.title.y = element_text(margin = margin(0, 20, 0, 0))) +
+    guides(fill = guide_legend(title = "Mendelian probability"))
+
+  plot_delta <- ggplot(data = data.delta, aes(x = delta, fill = P)) +
+    geom_histogram(data = subset(data.delta, P == 'delta2'), bins = 30) +
+    geom_histogram(data = subset(data.delta, P == 'delta1'), alpha = 0.8, bins = 30) +
+    xlab(label = "delta") +
+    ylab(label = "number of individuals") +
+    theme(axis.title.x = element_text(margin = margin(20, 0, 0, 0))) +
+    theme(axis.title.y = element_text(margin = margin(0, 20, 0, 0))) +
+    guides(fill = guide_legend(title = "Delta"))
+
+  plot_miss <- ggplot(data = data.miss, aes(x = miss, fill = P)) +
+    geom_histogram(data = subset(data.miss, P == 'miss2'), bins = 30) +
+    geom_histogram(data = subset(data.miss, P == 'miss1'), alpha = 0.8, bins = 30) +
+    xlab(label = "number of mismatches") +
+    ylab(label = "number of individuals") +
+    theme(axis.title.x = element_text(margin = margin(20, 0, 0, 0))) +
+    theme(axis.title.y = element_text(margin = margin(0, 20, 0, 0))) +
+    guides(fill = guide_legend(title = "missmatches"))
+
+  if (method == 'delta') {
+    # Add delta threshold
+
+    plot_mendel <- plot_mendel +
+      geom_vline(xintercept = threshold)
+
+  } else if (method == 'Pmendel') {
+    # Add Pmendel threshold
+
+    plot_mendel <- plot_mendel +
+      geom_vline(xintercept = threshold)
+
+  } else {
+    # Add mismatches threshold
+
+    plot_miss <- plot_miss +
+      geom_vline(xintercept = threshold)
+
+  }
+
+  grid.arrange(plot_delta, plot_mendel, plot_miss, nrow = 3, ncol = 1)
+
+  return(list(pedigree = pedigree, log = log, error = error, threshold = threshold))
+
 }
