@@ -167,7 +167,7 @@ assignment <- function(offspring, sire, dam, thresh = ncol(offspring)) {
 
   # Set up the cluster for parallel iteration
   cl <- makeCluster(parallel::detectCores()-1)
-  registerDoParallel(cl)
+  registerDoSNOW(cl)
 
   iterations <- nrow(offspring)
   pb <- txtProgressBar(min = 0, max = iterations, char = "><(((°> ", style = 3)
@@ -178,7 +178,7 @@ assignment <- function(offspring, sire, dam, thresh = ncol(offspring)) {
 
   # Start
   A <- foreach(off=1:iterations, .multicombine = T,
-               .packages = c('foreach', 'doParallel'), .options.snow = opts) %dopar% { # For each offspring
+               .packages = c('foreach', 'doParallel', 'doSNOW'), .options.snow = opts) %dopar% { # For each offspring
 
                  tmp <- offspring[off,, drop = F]
 
@@ -213,7 +213,7 @@ assignment <- function(offspring, sire, dam, thresh = ncol(offspring)) {
                  }
 
                  t <- foreach(n = 1:nrow(res), .combine = rbind,
-                              .multicombine = T, .packages = c('foreach', 'doParallel')) %dopar% { # For each parents pair
+                              .multicombine = T, .packages = c('foreach', 'doParallel', 'doSNOW')) %dopar% { # For each parents pair
 
                                 #p = sire // m = dam
                                 p <- sire[which(rownames(sire)==res[n,1]),, drop = F]
