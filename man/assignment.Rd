@@ -4,7 +4,8 @@
 \alias{assignment}
 \title{Assignment function to obtain the average Mendelian transmission probabilities}
 \usage{
-assignment(offspring, sire, dam, thresh = ncol(offspring))
+assignment(offspring, sire, dam, thresh = ncol(offspring),
+  preselect.Parent = F)
 }
 \arguments{
 \item{offspring}{Offspring genotypes | Matrix (n*p) where n = number of individuals, p = number of markers
@@ -20,6 +21,8 @@ rownames(dam) = labels of dams
 marker coding = "All1/All2" example: "A/A", "A/B", "NA/NA" (for missing genotype)}
 
 \item{thresh}{(default: ncol(offspring) Threshold for exclusion (number of mismatches allowed)}
+
+\item{preselect.Parent}{(default: FALSE) Preselection of parents. Can be FALSE, an integer or a vector of two integers (number of sires, numbers of dams)}
 }
 \value{
 intermidiate pedigree

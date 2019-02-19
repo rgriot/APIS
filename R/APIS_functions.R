@@ -18,6 +18,7 @@
 #' marker coding = "All1/All2" example: "A/A", "A/B", "NA/NA" (for missing genotype)
 #' @param error (default: NULL) The assignment error rate accepted by the user
 #' @param exclusion.threshold (default: ncol(off.genotype)) Threshold for exclusion (number of mismatches allowed)
+#' @param preselect.Parent (default: FALSE) Preselection of parents. Can be FALSE, an integer or a vector of two integers (number of sires, numbers of dams)
 #' @keywords assignment APIS
 #' @return pedigree
 #' @return a log file
@@ -28,7 +29,7 @@
 #'                dam.genotype = dam_full,
 #'                error = 0.05)
 #' @export
-APIS <- function(off.genotype, sire.genotype, dam.genotype, error = NULL, exclusion.threshold = ncol(off.genotype)) {
+APIS <- function(off.genotype, sire.genotype, dam.genotype, error = NULL, exclusion.threshold = ncol(off.genotype), preselect.Parent = F) {
 
   # Check inputs
 
@@ -71,7 +72,7 @@ APIS <- function(off.genotype, sire.genotype, dam.genotype, error = NULL, exclus
   }
 
   # Assign with APIS
-  assignResult 	<- assignment(off = off.genotype, sire = sire.genotype, dam = dam.genotype, thresh = exclusion.threshold)
+  assignResult 	<- assignment(offspring = off.genotype, sire = sire.genotype, dam = dam.genotype, preselect.Parent = preselect.Parent)
   apisResult 		<- setThreshold(ped.log = assignResult$log.mendel, ped.exclu = assignResult$exclu, nb.mrk = assignResult$nb.mrk, error = error)
 
   pedigree 	<- apisResult$pedigree
@@ -108,12 +109,13 @@ APIS <- function(off.genotype, sire.genotype, dam.genotype, error = NULL, exclus
 #' rownames(dam) = labels of dams
 #' marker coding = "All1/All2" example: "A/A", "A/B", "NA/NA" (for missing genotype)
 #' @param thresh (default: ncol(offspring) Threshold for exclusion (number of mismatches allowed)
+#' @param preselect.Parent (default: FALSE) Preselection of parents. Can be FALSE, an integer or a vector of two integers (number of sires, numbers of dams)
 #' @keywords assignment
 #' @return intermidiate pedigree
 #' @return log file for Mendelian transmission probabilities
 #' @return log file for exclusion
 #' @export
-assignment <- function(offspring, sire, dam, thresh = ncol(offspring)) {
+assignment <- function(offspring, sire, dam, thresh = ncol(offspring), preselect.Parent = F) {
   # DESCRIPTION
   # Function to calculate average Mendelian transmission probabilities
 
@@ -162,6 +164,12 @@ assignment <- function(offspring, sire, dam, thresh = ncol(offspring)) {
   rownames(hetero_exclu) <- c('AA', 'AB', 'BB', 'AC', 'BC', 'CC', 'miss')
   colnames(hetero_exclu) <- c('AA', 'AB', 'BB', 'AC', 'BC', 'CC', 'miss')
 
+  # Variables for parent selection
+  parent.genotype <- rbind(sire, dam)
+
+  parent.sex <- c(rep("M", times = nrow(sire)), rep("F", times = nrow(dam)))
+
+  # Assignment Process
   cat('Assignment')
   cat('\n')
 
@@ -182,11 +190,24 @@ assignment <- function(offspring, sire, dam, thresh = ncol(offspring)) {
 
                  tmp <- offspring[off,, drop = F]
 
+
+                 if (preselect.Parent == F) {
+                   potential.sire <- rownames(sire)
+                   potential.dam <- rownames(dam)
+                 } else {
+                   potential.parents <- selectParents(tmp, parent.genotype = parent.genotype,
+                                                      parent.sex = parent.sex, n.Parent = preselect.Parent)
+
+                   potential.sire <- potential.parents$sire_toKeep
+                   potential.dam <- potential.parents$dam_toKeep
+                 }
+
+
                  # Create temporary results
-                 res <- matrix(NA, nrow = (nrow(sire)*nrow(dam)), ncol = 4)
+                 res <- matrix(NA, nrow = (length(potential.sire)*length(potential.dam)), ncol = 4)
                  colnames(res) <- c('sire', 'dam', 'score_exclu', 'P_mendel')
-                 res[,1] <- rep(rownames(sire), each = nrow(dam))
-                 res[,2] <- rep(rownames(dam), times = nrow(sire))
+                 res[,1] <- rep(potential.sire, each = length(potential.dam))
+                 res[,2] <- rep(potential.dam, times = length(potential.sire))
 
                  # Lielihood tables
                  table_like <- vector('list', x.col)
@@ -827,5 +848,144 @@ personalThreshold <- function(APIS.result, method, threshold = NULL) {
   grid.arrange(plot_delta, plot_mendel, plot_miss, nrow = 3, ncol = 1)
 
   return(list(pedigree = pedigree, log = log, error = error, threshold = threshold))
-
 }
+
+# ------------------------------------------------------------------------------------------------------------------
+#' Select most likely parents for potent parent pairs tests
+#'
+#' This function allows the selection of the most likely parents for assignment, reducing computation time
+#' @param off.genotype genotype of one offspring
+#' @param parent.genotype genotype matrix of parent genotypes
+#' @param parent.sex vector of parents sex
+#' @param n.Parent vector of number of sires and dams to select
+#' @return list of potential sires and dams
+#' @keywords assignment APIS threshold
+#' @export
+selectParents <- function(off.genotype, parent.genotype, parent.sex, n.Parent) {
+  # Initialize the variables
+  if (length(n.Parent) == 1) {
+    sire.keep <- n.Parent
+    dam.keep <- n.Parent
+  } else {
+    sire.keep <- n.Parent[1]
+    dam.keep <- n.Parent[2]
+  }
+
+
+  i <- 1
+
+  output <- data.frame(parent = rownames(parent.genotype),
+                       sex = parent.sex,
+                       mismatch = NA)
+  output$parent <- as.character(output$parent)
+
+  # Create the probability tables
+  off.geno <- strsplit(off.genotype, split = '/')
+  probability_table <- vector('list', length(off.genotype))
+
+  for (m in c(1:length(off.genotype))) {
+    # If the offspring is homozygous
+    if (off.geno[[m]][1] == off.geno[[m]][2]) {
+      probability_table[[m]] <- c(0, 0, 1, NA)
+    } else {
+      probability_table[[m]] <- c(0, 0, 0, 0, 0, 1, NA)
+    }
+  }
+
+  # Loop over all the parents
+  for (p in output$parent) {
+    p.geno <- parent.genotype[which(rownames(parent.genotype) %in% p),]
+    p.geno <- strsplit(p.geno, split = '/')
+    # Probability
+    parent_probability <- rep(NA, length(p.geno))
+
+    # Loop over all the markers
+    for (m in c(1:length(off.genotype))) {
+
+      off.mrk <- off.geno[[m]]
+      p.mrk <- p.geno[[m]]
+
+      if (off.mrk[1] == off.mrk[2] & off.mrk[1] == 'NA') { # If offspring is NA/NA
+        parent_probability[m] <- 1
+      } else if (off.mrk[1] == off.mrk[2] & off.mrk[1] != 'NA') { # If offspring is homozygous
+        # Check parent genotype
+        if (p.mrk[1] == p.mrk[2] & p.mrk[1] == 'NA') { # parent NA/NA
+          parent_probability[m] <- probability_table[[m]][4]
+        } else if (p.mrk[1] == p.mrk[2] & p.mrk[1] != 'NA') {
+          if (p.mrk[1] == off.mrk[1]) { # parent A/A
+            parent_probability[m] <- probability_table[[m]][1]
+          } else { # parent C/C
+            parent_probability[m] <- probability_table[[m]][3]
+          }
+        } else { # parent heterozygous
+          if ((p.mrk[1] != off.mrk[1] & p.mrk[2] != off.mrk[1]) & (p.mrk[1] != off.mrk[2] & p.mrk[2] != off.mrk[2])) {
+            parent_probability[m] <- probability_table[[m]][3]
+          } else {
+            parent_probability[m] <- probability_table[[m]][2]
+          }
+        }
+      } else { # If offspring is heterozygous
+        if (p.mrk[1] == p.mrk[2]) { # parent homzygous
+          if (p.mrk[1] == 'NA') { # parent NA/NA
+            parent_probability[m] <- probability_table[[m]][7]
+          } else if (p.mrk[1] == off.mrk[1]) { # parent A/A
+            parent_probability[m] <- probability_table[[m]][1]
+          } else if (p.mrk[1] == off.mrk[2]) { # parent B/B
+            parent_probability[m] <- probability_table[[m]][3]
+          } else { # parent C/C
+            parent_probability[m] <- probability_table[[m]][6]
+          }
+        } else { # parent heterozygous
+          if ((p.mrk[1] == off.mrk[1] | p.mrk[2] == off.mrk[1]) & (p.mrk[1] == off.mrk[2] | p.mrk[2] == off.mrk[2])) {
+            # parent A/B
+            parent_probability[m] <- probability_table[[m]][2]
+          } else if ((p.mrk[1] == off.mrk[1] | p.mrk[2] == off.mrk[1]) & (p.mrk[1] != off.mrk[2] | p.mrk[2] != off.mrk[2])) {
+            # parent A/C
+            parent_probability[m] <- probability_table[[m]][4]
+          } else if ((p.mrk[1] != off.mrk[1] | p.mrk[2] != off.mrk[1]) & (p.mrk[1] == off.mrk[2] | p.mrk[2] == off.mrk[2])) {
+            # parent B/C
+            parent_probability[m] <- probability_table[[m]][5]
+          } else {
+            # parent C/C
+            parent_probability[m] <- probability_table[[m]][6]
+          }
+        }
+      }
+    }
+
+    # Calculte the average probability for the parent
+    # Write the result
+    output[i, 3] <- sum(parent_probability, na.rm = T)
+    i <- i + 1
+  }
+
+  output <- output[order(output$mismatch),]
+
+
+  sire_toKeep <- output[which(output$sex == 'M'), ]
+  s.keep <- sire_toKeep[which(sire_toKeep$mismatch >= min(output$mismatch) &  sire_toKeep$mismatch <= (min(output$mismatch) + 2)),]
+  select.sire <- ifelse(test = sire.keep > nrow(sire_toKeep), yes = nrow(sire_toKeep), no = sire.keep)
+
+  if (nrow(s.keep) < sire.keep) {
+    s.keep <- rbind(s.keep, sire_toKeep[c((nrow(s.keep) + 1):select.sire),])
+  } else {
+    s.keep <- s.keep
+  }
+  sire_toKeep <- s.keep$parent
+
+  dam_toKeep <- output[which(output$sex == 'F'), ]
+  d.keep <- dam_toKeep[which(dam_toKeep$mismatch >= min(output$mismatch) & dam_toKeep$mismatch <= (min(output$mismatch) + 2)),]
+  select.dam <- ifelse(test = dam.keep > nrow(dam_toKeep), yes = nrow(dam_toKeep), no = dam.keep)
+
+
+  if (nrow(d.keep) < dam.keep) {
+    d.keep <- rbind(d.keep, dam_toKeep[c((nrow(d.keep) + 1):select.dam),])
+  } else {
+    d.keep <- d.keep
+  }
+  dam_toKeep <- d.keep$parent
+
+  # Return the most likely parents
+  return(list(sire_toKeep = sire_toKeep, dam_toKeep = dam_toKeep))
+}
+

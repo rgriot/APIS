@@ -5,7 +5,7 @@
 \title{APIS function that assigns with observed data}
 \usage{
 APIS(off.genotype, sire.genotype, dam.genotype, error = NULL,
-  exclusion.threshold = ncol(off.genotype))
+  exclusion.threshold = ncol(off.genotype), preselect.Parent = F)
 }
 \arguments{
 \item{off.genotype}{Offspring genotypes | Matrix (n*p)
@@ -29,6 +29,8 @@ marker coding = "All1/All2" example: "A/A", "A/B", "NA/NA" (for missing genotype
 \item{error}{(default: NULL) The assignment error rate accepted by the user}
 
 \item{exclusion.threshold}{(default: ncol(off.genotype)) Threshold for exclusion (number of mismatches allowed)}
+
+\item{preselect.Parent}{(default: FALSE) Preselection of parents. Can be FALSE, an integer or a vector of two integers (number of sires, numbers of dams)}
 }
 \value{
 pedigree
