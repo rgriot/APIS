@@ -1,6 +1,11 @@
 ---
 title: 'APIS: An Auto-Adaptive Parentage Inference Software tolerant to missing parents'
-author: "Ronan GRIOT"
+author: |
+  | Ronan GRIOT $^{1,2}$, François ALLAL $^{3}$, Marc VANDEPUTTE $^{2,3}$
+  |
+  | $^{1}$SYSAAF, Station LPGP/INRA, Campus de Beaulieu, Rennes, France
+  | $^{2}$GABI, INRA, AgroParisTech, Université Paris-Saclay, France
+  | $^{3}$MARBEC, Univ. Montpellier, Ifremer, CNRS, IRD, Palavas-les-Flots, France
 date: "`r Sys.Date()`"
 output:
   pdf_document: default
@@ -13,7 +18,8 @@ vignette: |
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  fig.pos = 'ht !'
 )
 ```
 
@@ -31,8 +37,8 @@ devtools::install_github("rgriot/APIS")
 library(APIS)
 ```
 # Formate your data
-APIS requires matrices of characters.
-Each matrix has individuals as rows, markers as columns. The individual labels are set as rownames. Each cell is the genotype of one marker, coded "All1/All2". For example "A/A", "A/B", "B/B" for bi-allelic markers and "NA/NA" for missing value.
+APIS requires matrices of characters as inputs.
+Each matrix has individuals as rows, markers as columns. The individual labels are set as rownames. Each cell is the genotype of one marker, coded "All1/All2". For example "A/A", "A/B", "B/B" for bi-allelic markers and "NA/NA" for missing value. For multi-allelic markers, use the generic coding "All1/All2".
 
 ```{r}
 data("genotype_APIS")
@@ -41,23 +47,29 @@ head(off_full[,1:10])
 rownames(off_full[1:6,])
 ```
 
+\newpage
+
 # Prepare the inputs
 APIS main function requires 4 inputs :
 
-  * off.genotype = matrix of offspring genotypes
+  * off.genotype = matrix of offspring genotypes coded as explained above
   
-  * sire.genotype = matrix of sires genotypes
+  * sire.genotype = matrix of sires genotypes coded as explained above
   
-  * dam.genotype = matrix of dams genotypes
+  * dam.genotype = matrix of dams genotypes coded as explained above
   
   * error = accepted assignment error rate (What is the maximum error rate I accept in my assignment results ?)
 
 ```{r}
+head(off_full[,1:10])
+head(sire_full[,1:10])
+head(dam_full[,1:10])
 error <- 0.05 #I accept 5% of errors in the results
 ```
 
 # Running the assignment
-The main function to perform parentage assignment with APIS the "APIS" function
+The main function to perform parentage assignment with APIS the "APIS" function.
+Use the function as below, with default parameters for exclusion threshold and preselection of parents for maximizing the reliability.
 
 ```{r, eval = F}
 result <- APIS(off.genotype = off_full,
@@ -71,9 +83,9 @@ APIS gives you 3 different outputs :
   
   * pedigree
   
-  * log containing Mendelian transmission probabilities for the first 3 parent pairs
+  * log containing Mendelian transmission probabilities, mismatches and deltas for the first 3 parent pairs
   
-  * graphs
+  * graphs of the distributions of deltas, Mendelian transmission probabilities and mismatches
 
 According to the graphs, you can change the thresholds to improve your assignment.
 
@@ -95,48 +107,51 @@ new.result <- personalThreshold(APIS.result = result,
 
 # Examples
 ## Full data
-This example use the full data provided by the package.
+This example uses the full data provided by the package (Figure 1).
 
 ```{r, eval = F}
-data("genotype_APIS")
 result <- APIS(off.genotype = off_full,
                sire.genotype = sire_full,
                dam.genotype = dam_full,
                error = 0.05)
 ```
-```{r , echo=FALSE, fig.cap="APIS outputs calculated on 1000 offspring from 10 sires and 10 dams, genotyped on 400 markers", out.width = '100%'}
+```{r , echo=FALSE, fig.cap="APIS outputs calculated on 1000 offspring from 10 sires and 10 dams, genotyped on 400 markers", out.width = '70%', fig.align='center'}
 knitr::include_graphics('D:/Data_RG/package_APIS/APIS/vignettes/fulldata_APIS.png')
 ```
 
-When I look at the mismatch distributions, I prefer to use exclusion and allow for 5 mismatches
+When I look at the mismatch distributions, I prefer to use exclusion and allow for 5 mismatches (Figure 2).
 
 ```{r, eval = F}
 new.result <- personalThreshold(APIS.result = result,
                                 method = 'exclusion',
                                 threshold = 5)
 ```
-```{r , echo=FALSE, fig.cap="APIS outputs based on mismatches calculated on 1000 offspring from 10 sires and 10 dams, genotyped on 400 markers", out.width = '100%'}
+
+\newpage
+
+```{r , echo=FALSE, fig.cap="APIS outputs based on mismatches calculated on 1000 offspring from 10 sires and 10 dams, genotyped on 400 markers", out.width = '70%', fig.align='center'}
 knitr::include_graphics('D:/Data_RG/package_APIS/APIS/vignettes/fulldata_mismatch.png')
 ```
 
+\newpage
+
 ## Degraded data
-This example use the degraded data provided by the package.
+This example uses the degraded data provided by the package (Figure 3).
 
 ```{r, eval = F}
-data("genotype_APIS")
 result <- APIS(off.genotype = off_degraded,
                sire.genotype = sire_degraded,
                dam.genotype = dam_degraded,
                error = 0.05)
 ```
-```{r , echo=FALSE, fig.cap="APIS outputs calculated on 1000 offspring from 5 sires (5 missing sires) and 10 dams, genotyped on 50 markers", out.width = '100%'}
-knitr::include_graphics('D:/Data_RG/package_APIS/APIS/vignettes/degradeddata_APIS.png')
-```
-
 In this situation, the theoretical assignment power is low and there are missing parents.
 The distribution graphs do not give you more information about a new threshold value.
 
 Thus, the better answer is to keep APIS results.
+
+```{r , echo=FALSE, fig.cap="APIS outputs calculated on 1000 offspring from 5 sires (5 missing sires) and 10 dams, genotyped on 50 markers", out.width = '70%', fig.align='center'}
+knitr::include_graphics('D:/Data_RG/package_APIS/APIS/vignettes/degradeddata_APIS.png')
+```
 
 # Other parameters of APIS function
 APIS function can handle 2 other parameters :
