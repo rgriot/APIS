@@ -509,9 +509,6 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring)) {
   variant.corres$variant <- as.character(variant.corres$variant)
   variant.corres <- rbind(variant.corres, c(as.character("NA"), 0))
 
-
-
-
   cl <- makeCluster(detectCores() - 1)
   registerDoParallel(cl)
 
@@ -542,11 +539,6 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring)) {
   Freq <- apply(Freq, 2, as.numeric)
   Freq <- Freq[,order(Freq[1,])]
   Freq <- Freq[-1,]
-
-  # Load the Fortran library
-  cat('Load the Fortran library')
-  cat('\n')
-  dyn.load("./src/APIS", PACKAGE = "APIS")
 
   # Assignment Process
   cat('Assignment')
