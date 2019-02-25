@@ -4,7 +4,8 @@
 \alias{assignmentFortran}
 \title{Assignment function to obtain the average Mendelian transmission probabilities using a Fortran library}
 \usage{
-assignmentFortran(offspring, sire, dam, thresh = ncol(offspring))
+assignmentFortran(offspring, sire, dam, thresh = ncol(offspring),
+  preselect.Parent = F)
 }
 \arguments{
 \item{offspring}{Offspring genotypes | Matrix (n*p) where n = number of individuals, p = number of markers

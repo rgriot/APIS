@@ -36,6 +36,15 @@ library(APIS)
 devtools::install_github("rgriot/APIS")
 library(APIS)
 ```
+
+If an error message occurs during the installation, use the following command :
+```{r, eval=F}
+devtools::install_github("rgriot/APIS", args = "--no-multiarch")
+library(APIS)
+```
+
+\newpage
+
 # Formate your data
 APIS requires matrices of characters as inputs.
 Each matrix has individuals as rows, markers as columns. The individual labels are set as rownames. Each cell is the genotype of one marker, coded "All1/All2". For example "A/A", "A/B", "B/B" for bi-allelic markers and "NA/NA" for missing value. For multi-allelic markers, use the generic coding "All1/All2".

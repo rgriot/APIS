@@ -72,7 +72,11 @@ APIS <- function(off.genotype, sire.genotype, dam.genotype, error = NULL, exclus
   }
 
   # Assign with APIS
-  assignResult 	<- assignmentFortran(offspring = off.genotype, sire = sire.genotype, dam = dam.genotype, thresh = exclusion.threshold)
+  assignResult 	<- assignmentFortran(offspring = off.genotype,
+                                     sire = sire.genotype,
+                                     am = dam.genotype,
+                                     thresh = exclusion.threshold,
+                                     preselect.Parent = preselect.Parent)
   apisResult 		<- setThreshold(ped.log = assignResult$log.mendel, ped.exclu = assignResult$exclu, nb.mrk = assignResult$nb.mrk, error = error)
 
   pedigree 	<- apisResult$pedigree
@@ -114,7 +118,6 @@ APIS <- function(off.genotype, sire.genotype, dam.genotype, error = NULL, exclus
 #' @return intermidiate pedigree
 #' @return log file for Mendelian transmission probabilities
 #' @return log file for exclusion
-#' @export
 assignment <- function(offspring, sire, dam, thresh = ncol(offspring), preselect.Parent = F) {
   # DESCRIPTION
   # Function to calculate average Mendelian transmission probabilities
@@ -451,7 +454,7 @@ assignment <- function(offspring, sire, dam, thresh = ncol(offspring), preselect
 #' @return log file for Mendelian transmission probabilities
 #' @return log file for exclusion
 #' @export
-assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring)) {
+assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), preselect.Parent = F) {
 
   # DESCRIPTION
   # Function to calculate average Mendelian transmission probabilities
@@ -461,17 +464,8 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring)) {
     stop('Genotypes must have the same number of markers')
 
   # Create the results matrix
-  ped.log <- as.data.frame(matrix(NA,nrow = nrow(offspring), ncol = 16))
-  colnames(ped.log) <- c('off', 'mrk_genotype','sire1', 'dam1', 'miss1', 'mendel1',
-                         'sire2', 'dam2', 'miss2', 'mendel2', 'delta_Pmendel12',
-                         'sire3', 'dam3', 'miss3', 'mendel3', 'delta_Pmendel23')
-  ped.log[,1] <- rownames(offspring)
-  ped.log[,2] <- as.numeric(apply(offspring,1, function(X) {length(X[X!='NA/NA'])}))
-
-  ped.exclu <- as.data.frame(matrix(NA, nrow = nrow(offspring), ncol = 11))
-  colnames(ped.exclu) <- c('off', 'mrk_genotype','sire1', 'dam1', 'miss1',
-                           'sire2', 'dam2', 'miss2',
-                           'sire3', 'dam3', 'miss3')
+  offspring.name <- rownames(offspring)
+  genotyped.mrk  <- as.numeric(apply(offspring,1, function(X) {length(X[X!='NA/NA'])}))
 
   # Parameters
   e <- 0.01 # Genotyping error of 1%
@@ -510,22 +504,39 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring)) {
   variant.corres <- rbind(variant.corres, c(as.character("NA"), 0))
 
   cl <- makeCluster(detectCores() - 1)
-  registerDoParallel(cl)
+  registerDoSNOW(cl)
 
+  pb.recodeOff <- txtProgressBar(min = 0, max = iterations, char = '><> ', style = 3)
+  progress <- function(n) {setTxtProgressBar(pb.recodeOff, n)}
+  opts <- list(progress = progress)
 
-  recode.off <- foreach(i = 1:iterations, .combine = rbind) %dopar% {
+  recode.off <- foreach(i = 1:iterations, .combine = rbind, .options.snow = opts) %dopar% {
     tmp <- as.numeric(as.vector(sapply(offspring[i,, drop = F], recodeFortran, list.mrk = variant.corres)))
   }
 
-  recode.sire <- foreach(i = 1:nrow(sire), .combine = rbind) %dopar% {
+  cat('\n')
+
+  pb.recodeSire <- txtProgressBar(min = 0, max = nrow(sire), char = '><> ', style = 3)
+  progress <- function(n) {setTxtProgressBar(pb.recodeSire, n)}
+  opts <- list(progress = progress)
+
+  recode.sire <- foreach(i = 1:nrow(sire), .combine = rbind, .options.snow = opts) %dopar% {
     tmp <- as.numeric(as.vector(sapply(sire[i,, drop = F], recodeFortran, list.mrk = variant.corres)))
   }
 
-  recode.dam <- foreach(i = 1:nrow(dam), .combine = rbind) %dopar% {
+  cat('\n')
+
+  pb.recodeDam <- txtProgressBar(min = 0, max = nrow(dam), char = '><> ', style = 3)
+  progress <- function(n) {setTxtProgressBar(pb.recodeDam, n)}
+  opts <- list(progress = progress)
+
+  recode.dam <- foreach(i = 1:nrow(dam), .combine = rbind, .options.snow = opts) %dopar% {
     tmp <- as.numeric(as.vector(sapply(dam[i,, drop = F], recodeFortran, list.mrk = variant.corres)))
   }
 
   stopCluster(cl)
+
+  cat('\n')
 
   rownames(recode.off) <- rownames(offspring)
   rownames(recode.sire) <- rownames(sire)
@@ -544,79 +555,102 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring)) {
   cat('Assignment')
   cat('\n')
 
-  pb <- txtProgressBar(min = 0, max = iterations, char = "><(((°> ", style = 3)
+  # Set up the cluster for parallel iteration
+  cl <- makeCluster(parallel::detectCores()-1)
+  registerDoSNOW(cl)
 
-  for (off in 1:nrow(offspring)) { #Pour chaque descendant
-    tmp <- recode.off[off,]
+  pb.assignment <- txtProgressBar(min = 0, max = iterations, char = "><(((°> ", style = 3)
+  progress <- function(n) {setTxtProgressBar(pb.assignment, n)}
+  opts <- list(progress = progress)
 
-    #Resultats
-    res <- matrix(NA, nrow = (nrow(sire)*nrow(dam)), ncol = 4)
-    colnames(res) <- c('sire', 'dam', 'score_exclu', 'P_mendel')
-    res[,1] <- rep(rownames(sire), each = nrow(dam))
-    res[,2] <- rep(rownames(dam), times = nrow(sire))
-    res <- as.data.frame(res)
+  A <- foreach(off = 1:iterations, .multicombine = T,
+               .packages = c('foreach', 'doParallel', 'doSNOW', 'APIS'), .options.snow = opts) %dopar% { # For each offspring
 
-    nMrk         = as.integer(x.col)
-    nSires       = as.integer(nrow(recode.sire))
-    nDams        = as.integer(nrow(recode.dam))
-    nVariant     = as.integer(ncol(Freq))
-    output_sires = vector(mode = 'integer', length = nSires*nDams)
-    output_dams  = vector(mode = 'integer', length = nSires*nDams)
-    output_score = vector(mode = 'numeric', length = nSires*nDams)
-    output_miss  = vector(mode = 'numeric', length = nSires*nDams)
+                 tmp <- recode.off[off,]
 
-    outputFortran <- .Fortran("likelihoodcalculation", as.integer(tmp), as.integer(recode.sire),
-                              as.integer(recode.dam), as.integer(nMrk), as.integer(nVariant), as.integer(nSires), as.integer(nDams),
-                              as.double(Freq), output_sires, output_dams, as.double(output_score), as.integer(output_miss))
+                 if (preselect.Parent == F) {
+                   potential.sire <- rownames(sire)
+                   potential.dam <- rownames(dam)
+                 } else {
+                   potential.parents <- selectParents(tmp, parent.genotype = parent.genotype,
+                                                      parent.sex = parent.sex, n.Parent = preselect.Parent)
+
+                   potential.sire <- potential.parents$sire_toKeep
+                   potential.dam <- potential.parents$dam_toKeep
+                 }
+
+                 # Create temporary results
+                 res <- matrix(NA, nrow = (length(potential.sire)*length(potential.dam)), ncol = 4)
+                 colnames(res) <- c('sire', 'dam', 'score_exclu', 'P_mendel')
+                 res[,1] <- rep(potential.sire, each = length(potential.dam))
+                 res[,2] <- rep(potential.dam, times = length(potential.sire))
+
+                 # Prepare Frotran inputs
+                 nMrk         = as.integer(x.col)
+                 nSires       = as.integer(nrow(recode.sire))
+                 nDams        = as.integer(nrow(recode.dam))
+                 nVariant     = as.integer(ncol(Freq))
+                 output_sires = vector(mode = 'integer', length = nSires*nDams)
+                 output_dams  = vector(mode = 'integer', length = nSires*nDams)
+                 output_score = vector(mode = 'numeric', length = nSires*nDams)
+                 output_miss  = vector(mode = 'numeric', length = nSires*nDams)
+
+                 outputFortran <- .Fortran("likelihoodcalculation", as.integer(tmp), as.integer(recode.sire),
+                                           as.integer(recode.dam), as.integer(nMrk), as.integer(nVariant), as.integer(nSires), as.integer(nDams),
+                                           as.double(Freq), output_sires, output_dams, as.double(output_score), as.integer(output_miss))
 
 
-    res[,3] <- as.integer(outputFortran[[12]])
-    res[,4] <- exp(as.numeric(as.numeric(outputFortran[[11]]))/ped.log[off,2])
+                 res[,3] <- as.integer(outputFortran[[12]])
+                 res[,4] <- exp(as.numeric(as.numeric(outputFortran[[11]]))/genotyped.mrk[off])
 
-    #Working on the results
-    res$sire <- as.character(res$sire)
-    res$dam <- as.character(res$dam)
-    res$score_exclu <- as.numeric(as.character(res$score_exclu))
-    res$P_mendel <- as.numeric(as.character(res$P_mendel))
+                 #Working on the results
+                 res <- as.data.frame(res)
+                 res$sire <- as.character(res$sire)
+                 res$dam <- as.character(res$dam)
+                 res$score_exclu <- as.numeric(as.character(res$score_exclu))
+                 res$P_mendel <- as.numeric(as.character(res$P_mendel))
 
-    # Order by Mendelian transmission probabilities
-    res2 <- res[order(res[,4], res[,3], decreasing = T),]
+                 # Order by Mendelian transmission probabilities
+                 res2 <- res[order(res[,4], res[,3], decreasing = T),]
 
-    delta_P12 <- res2[1,4]-res2[2,4]
-    delta_P23 <- res2[2,4]-res2[3,4]
+                 delta_P12 <- res2[1,4] - res2[2,4]
+                 delta_P23 <- res2[2,4] - res2[3,4]
 
-    p_fin <- res2[1,1]
-    m_fin <- res2[1,2]
+                 p_fin <- res2[1,1]
+                 m_fin <- res2[1,2]
 
-    ped.log[off,3:ncol(ped.log)] <- unlist(c(p_fin, m_fin, res2[1, 3:4], res2[2,1:4], delta_P12, res2[3,1:4], delta_P23))
+                 out.log <- unlist(c(offspring.name[off], genotyped.mrk[off], p_fin, m_fin, res2[1, 3:4], res2[2,1:4], delta_P12, res2[3,1:4], delta_P23))
 
-    #Order by mismatches
-    res2 <- res[order(res[,3], -res[,4], decreasing = F),]
+                 #Order by mismatches
+                 res2 <- res[order(res[,3], -res[,4], decreasing = F),]
 
-    ped.exclu[off,] <- unlist(c(ped.log[off,c(1,2)], res2[1,1:3], res2[2,1:3], res2[3,1:3]))
+                 out.exclu <- unlist(c(offspring.name[off], genotyped.mrk[off], res2[1,1:3], res2[2,1:3], res2[3,1:3]))
 
-    setTxtProgressBar(pb, off)
-  }
+                 a <- list(out.log, out.exclu)
+               }
 
   cat('\n')
 
-  # Create the outputs
-  ped <- data.frame(off = ped.log$off,
-                    sire = ped.log$sire1,
-                    dam = ped.log$dam1)
-  colnames(ped) <- c('off', 'sire', 'dam')
-  rownames(ped) <- c(1:nrow(ped))
-
-  ped$off <- as.character(ped$off)
-  ped$sire <- as.character(ped$sire)
-  ped$dam <- as.character(ped$dam)
-
   # Create a log
+  ped.log <- as.data.frame(t(as.data.frame(lapply(A, function(X) {t <- X[[1]]}))))
+  colnames(ped.log) <- c('offspring', 'mrk_genotype', 'sire1', 'dam1', 'miss1', 'mendel1',
+                         'sire2', 'dam2', 'miss2', 'mendel2', 'delta_Pmendel12',
+                         'sire3', 'dam3', 'miss3', 'mendel3', 'delta_Pmendel23')
+  rownames(ped.log) <- c(1:nrow(ped.log))
+
   ped.log[,] <- sapply(ped.log[,c(1:ncol(ped.log))], as.character)
   ped.log[,c(2, 5:6, 9:11, 14:16)] <- sapply(ped.log[,c(2, 5:6, 9:11, 14:16)], as.numeric)
 
   # Create a data frame from results by exclusion
+  ped.exclu <- as.data.frame(t(as.data.frame(lapply(A, function(X) {t <- X[[2]]}))))
+  colnames(ped.exclu) <- c('off', 'mrk_genotype','sire1', 'dam1', 'miss1',
+                           'sire2', 'dam2', 'miss2',
+                           'sire3', 'dam3', 'miss3')
+  rownames(ped.exclu) <- c(1:nrow(ped.exclu))
   ped.exclu[,c(2,5,8,11)] <- sapply(ped.exclu[,c(2,5,8,11)], as.numeric)
+
+  # Create pedigree
+  ped <- ped.log[,c(1,3:4)]
 
   # Return the output
   return(list(pedigree = ped, log.mendel = ped.log, log.exclu = ped.exclu, nb.mrk = ncol(offspring)))
