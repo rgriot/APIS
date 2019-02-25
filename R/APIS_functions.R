@@ -478,6 +478,11 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
   x.col <- ncol(offspring)
   iterations <- nrow(offspring)
 
+  # Variables for parent selection
+  parent.genotype <- rbind(sire, dam)
+
+  parent.sex <- c(rep("M", times = nrow(sire)), rep("F", times = nrow(dam)))
+
   cat('Recoding datasets')
   cat('\n')
 
@@ -556,7 +561,7 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
   cat('\n')
 
   # Set up the cluster for parallel iteration
-  cl <- makeCluster(parallel::detectCores()-1)
+  cl <- makeCluster(parallel::detectCores() - 1)
   registerDoSNOW(cl)
 
   pb.assignment <- txtProgressBar(min = 0, max = iterations, char = "><(((°> ", style = 3)
