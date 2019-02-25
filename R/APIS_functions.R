@@ -561,7 +561,7 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
   cat('\n')
 
   # Set up the cluster for parallel iteration
-  cl <- makeCluster(parallel::detectCores() - 1)
+  cl <- makeCluster(detectCores() - 1)
   registerDoSNOW(cl)
 
   pb.assignment <- txtProgressBar(min = 0, max = iterations, char = "><(((°> ", style = 3)
@@ -584,6 +584,9 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
                    potential.dam <- potential.parents$dam_toKeep
                  }
 
+                 tmp.sire <- recode.sire[which(rownames(recode.sire) %in% potential.sire),]
+                 tmp.dam <- recode.dam[which(rownames(recode.dam) %in% potential.dam),]
+
                  # Create temporary results
                  res <- matrix(NA, nrow = (length(potential.sire)*length(potential.dam)), ncol = 4)
                  colnames(res) <- c('sire', 'dam', 'score_exclu', 'P_mendel')
@@ -600,8 +603,8 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
                  output_score = vector(mode = 'numeric', length = nSires*nDams)
                  output_miss  = vector(mode = 'numeric', length = nSires*nDams)
 
-                 outputFortran <- .Fortran("likelihoodcalculation", as.integer(tmp), as.integer(recode.sire),
-                                           as.integer(recode.dam), as.integer(nMrk), as.integer(nVariant), as.integer(nSires), as.integer(nDams),
+                 outputFortran <- .Fortran("likelihoodcalculation", as.integer(tmp), as.integer(tmp.sire),
+                                           as.integer(tmp.dam), as.integer(nMrk), as.integer(nVariant), as.integer(nSires), as.integer(nDams),
                                            as.double(Freq), output_sires, output_dams, as.double(output_score), as.integer(output_miss))
 
 
