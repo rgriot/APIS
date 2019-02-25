@@ -577,7 +577,7 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
                    potential.sire <- rownames(sire)
                    potential.dam <- rownames(dam)
                  } else {
-                   potential.parents <- selectParents(tmp, parent.genotype = parent.genotype,
+                   potential.parents <- selectParents(offspring[off,], parent.genotype = parent.genotype,
                                                       parent.sex = parent.sex, n.Parent = preselect.Parent)
 
                    potential.sire <- potential.parents$sire_toKeep
@@ -592,8 +592,8 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
 
                  # Prepare Frotran inputs
                  nMrk         = as.integer(x.col)
-                 nSires       = as.integer(nrow(recode.sire))
-                 nDams        = as.integer(nrow(recode.dam))
+                 nSires       = as.integer(length(potential.sire))
+                 nDams        = as.integer(length(potential.dam))
                  nVariant     = as.integer(ncol(Freq))
                  output_sires = vector(mode = 'integer', length = nSires*nDams)
                  output_dams  = vector(mode = 'integer', length = nSires*nDams)
@@ -633,6 +633,8 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
 
                  a <- list(out.log, out.exclu)
                }
+
+  stopCluster(cl)
 
   cat('\n')
 
