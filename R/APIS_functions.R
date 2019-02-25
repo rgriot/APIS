@@ -72,7 +72,7 @@ APIS <- function(off.genotype, sire.genotype, dam.genotype, error = NULL, exclus
   }
 
   # Assign with APIS
-  assignResult 	<- assignment(offspring = off.genotype, sire = sire.genotype, dam = dam.genotype, preselect.Parent = preselect.Parent)
+  assignResult 	<- assignmentFortran(offspring = off.genotype, sire = sire.genotype, dam = dam.genotype, thresh = exclusion.threshold)
   apisResult 		<- setThreshold(ped.log = assignResult$log.mendel, ped.exclu = assignResult$exclu, nb.mrk = assignResult$nb.mrk, error = error)
 
   pedigree 	<- apisResult$pedigree
@@ -425,6 +425,205 @@ assignment <- function(offspring, sire, dam, thresh = ncol(offspring), preselect
                            'sire2', 'dam2', 'miss2',
                            'sire3', 'dam3', 'miss3')
   rownames(ped.exclu) <- c(1:nrow(ped.exclu))
+  ped.exclu[,c(2,5,8,11)] <- sapply(ped.exclu[,c(2,5,8,11)], as.numeric)
+
+  # Return the output
+  return(list(pedigree = ped, log.mendel = ped.log, log.exclu = ped.exclu, nb.mrk = ncol(offspring)))
+}
+
+# ----------------------------------------------------------------------------------------------------------------
+#' Assignment function to obtain the average Mendelian transmission probabilities using a Fortran library
+#'
+#' This function calculates the average Mendelian transmission probabilities
+#' @param offspring Offspring genotypes | Matrix (n*p) where n = number of individuals, p = number of markers
+#' rownames(offspring) = labels of offspring
+#' marker coding = "All1/All2" example: "A/A", "A/B", "NA/NA" (for missing genotype)
+#' @param sire Sire genotypes | Matrix (n*p) where n = number of individuals, p = number of markers
+#' rownames(sire) = labels of sires
+#' marker coding = "All1/All2" example: "A/A", "A/B", "NA/NA" (for missing genotype)
+#' @param dam Dam genotypes | Matrix (n*p) where n = number of individuals, p = number of markers
+#' rownames(dam) = labels of dams
+#' marker coding = "All1/All2" example: "A/A", "A/B", "NA/NA" (for missing genotype)
+#' @param thresh (default: ncol(offspring) Threshold for exclusion (number of mismatches allowed)
+#' @param preselect.Parent (default: FALSE) Preselection of parents. Can be FALSE, an integer or a vector of two integers (number of sires, numbers of dams)
+#' @keywords assignment
+#' @return intermidiate pedigree
+#' @return log file for Mendelian transmission probabilities
+#' @return log file for exclusion
+#' @export
+assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring)) {
+
+  # DESCRIPTION
+  # Function to calculate average Mendelian transmission probabilities
+
+  # Stop if different number of markers are provided
+  if (ncol(offspring)!=ncol(sire)&ncol(offspring)!=ncol(dam))
+    stop('Genotypes must have the same number of markers')
+
+  # Create the results matrix
+  ped.log <- as.data.frame(matrix(NA,nrow = nrow(offspring), ncol = 16))
+  colnames(ped.log) <- c('off', 'mrk_genotype','sire1', 'dam1', 'miss1', 'mendel1',
+                         'sire2', 'dam2', 'miss2', 'mendel2', 'delta_Pmendel12',
+                         'sire3', 'dam3', 'miss3', 'mendel3', 'delta_Pmendel23')
+  ped.log[,1] <- rownames(offspring)
+  ped.log[,2] <- as.numeric(apply(offspring,1, function(X) {length(X[X!='NA/NA'])}))
+
+  ped.exclu <- as.data.frame(matrix(NA, nrow = nrow(offspring), ncol = 11))
+  colnames(ped.exclu) <- c('off', 'mrk_genotype','sire1', 'dam1', 'miss1',
+                           'sire2', 'dam2', 'miss2',
+                           'sire3', 'dam3', 'miss3')
+
+  # Parameters
+  e <- 0.01 # Genotyping error of 1%
+
+  # Estimate allele frequencies
+  cat('Estimation of allele frequencies')
+  cat('\n')
+  Freq <- allFreq(offspring)
+
+  x.col <- ncol(offspring)
+  iterations <- nrow(offspring)
+
+  cat('Recoding datasets')
+  cat('\n')
+
+  # Recode for Fortran subroutine
+  recodeFortran <- function(mrk, list.mrk) {
+    tmp <- unlist(strsplit(mrk, '/'))
+    all1 <- list.mrk[which(list.mrk[,1] == tmp[1]),2]
+    all2 <- list.mrk[which(list.mrk[,1] == tmp[2]),2]
+
+    return(c(all1, all2))
+  }
+
+  recodeFreq <- function(name.col, list.mrk) {
+    tmp <- unlist(strsplit(name.col, '_'))[2]
+    return(list.mrk[which(list.mrk[,1] == tmp), 2])
+  }
+
+  variant <- unique(unlist(strsplit(as.vector(offspring), '/')))
+  variant <- variant[-which(variant == "NA")]
+
+  variant.corres <- data.frame(variant = as.character(variant),
+                               recode = c(1:length(variant)))
+  variant.corres$variant <- as.character(variant.corres$variant)
+  variant.corres <- rbind(variant.corres, c(as.character("NA"), 0))
+
+
+
+
+  cl <- makeCluster(detectCores() - 1)
+  registerDoParallel(cl)
+
+
+  recode.off <- foreach(i = 1:iterations, .combine = rbind) %dopar% {
+    tmp <- as.numeric(as.vector(sapply(offspring[i,, drop = F], recodeFortran, list.mrk = variant.corres)))
+  }
+
+  recode.sire <- foreach(i = 1:nrow(sire), .combine = rbind) %dopar% {
+    tmp <- as.numeric(as.vector(sapply(sire[i,, drop = F], recodeFortran, list.mrk = variant.corres)))
+  }
+
+  recode.dam <- foreach(i = 1:nrow(dam), .combine = rbind) %dopar% {
+    tmp <- as.numeric(as.vector(sapply(dam[i,, drop = F], recodeFortran, list.mrk = variant.corres)))
+  }
+
+  stopCluster(cl)
+
+  rownames(recode.off) <- rownames(offspring)
+  rownames(recode.sire) <- rownames(sire)
+  rownames(recode.dam) <- rownames(dam)
+
+  Freq <- Freq[,-which(colnames(Freq) == "Freq_NA")]
+  Freq <- Freq[, c((floor(ncol(Freq)/2)+2):ncol(Freq))]
+
+  colnames(Freq) <- sapply(colnames(Freq), recodeFreq, list.mrk = variant.corres)
+  Freq <- rbind(colnames(Freq), Freq)
+  Freq <- apply(Freq, 2, as.numeric)
+  Freq <- Freq[,order(Freq[1,])]
+  Freq <- Freq[-1,]
+
+  # Load the Fortran library
+  cat('Load the Fortran library')
+  cat('\n')
+  dyn.load("./src/APIS")
+
+  # Assignment Process
+  cat('Assignment')
+  cat('\n')
+
+  pb <- txtProgressBar(min = 0, max = iterations, char = "><(((°> ", style = 3)
+
+  for (off in 1:nrow(offspring)) { #Pour chaque descendant
+    tmp <- recode.off[off,]
+
+    #Resultats
+    res <- matrix(NA, nrow = (nrow(sire)*nrow(dam)), ncol = 4)
+    colnames(res) <- c('sire', 'dam', 'score_exclu', 'P_mendel')
+    res[,1] <- rep(rownames(sire), each = nrow(dam))
+    res[,2] <- rep(rownames(dam), times = nrow(sire))
+    res <- as.data.frame(res)
+
+    nMrk         = as.integer(x.col)
+    nSires       = as.integer(nrow(recode.sire))
+    nDams        = as.integer(nrow(recode.dam))
+    nVariant     = as.integer(ncol(Freq))
+    output_sires = vector(mode = 'integer', length = nSires*nDams)
+    output_dams  = vector(mode = 'integer', length = nSires*nDams)
+    output_score = vector(mode = 'numeric', length = nSires*nDams)
+    output_miss  = vector(mode = 'numeric', length = nSires*nDams)
+
+    outputFortran <- .Fortran("likelihoodcalculation", as.integer(tmp), as.integer(recode.sire),
+                              as.integer(recode.dam), as.integer(nMrk), as.integer(nVariant), as.integer(nSires), as.integer(nDams),
+                              as.double(Freq), output_sires, output_dams, as.double(output_score), as.integer(output_miss))
+
+
+    res[,3] <- as.integer(outputFortran[[12]])
+    res[,4] <- exp(as.numeric(as.numeric(outputFortran[[11]]))/ped.log[off,2])
+
+    #Working on the results
+    res$sire <- as.character(res$sire)
+    res$dam <- as.character(res$dam)
+    res$score_exclu <- as.numeric(as.character(res$score_exclu))
+    res$P_mendel <- as.numeric(as.character(res$P_mendel))
+
+    # Order by Mendelian transmission probabilities
+    res2 <- res[order(res[,4], res[,3], decreasing = T),]
+
+    delta_P12 <- res2[1,4]-res2[2,4]
+    delta_P23 <- res2[2,4]-res2[3,4]
+
+    p_fin <- res2[1,1]
+    m_fin <- res2[1,2]
+
+    ped.log[off,3:ncol(ped.log)] <- unlist(c(p_fin, m_fin, res2[1, 3:4], res2[2,1:4], delta_P12, res2[3,1:4], delta_P23))
+
+    #Order by mismatches
+    res2 <- res[order(res[,3], -res[,4], decreasing = F),]
+
+    ped.exclu[off,] <- unlist(c(ped.log[off,c(1,2)], res2[1,1:3], res2[2,1:3], res2[3,1:3]))
+
+    setTxtProgressBar(pb, off)
+  }
+
+  cat('\n')
+
+  # Create the outputs
+  ped <- data.frame(off = ped.log$off,
+                    sire = ped.log$sire1,
+                    dam = ped.log$dam1)
+  colnames(ped) <- c('off', 'sire', 'dam')
+  rownames(ped) <- c(1:nrow(ped))
+
+  ped$off <- as.character(ped$off)
+  ped$sire <- as.character(ped$sire)
+  ped$dam <- as.character(ped$dam)
+
+  # Create a log
+  ped.log[,] <- sapply(ped.log[,c(1:ncol(ped.log))], as.character)
+  ped.log[,c(2, 5:6, 9:11, 14:16)] <- sapply(ped.log[,c(2, 5:6, 9:11, 14:16)], as.numeric)
+
+  # Create a data frame from results by exclusion
   ped.exclu[,c(2,5,8,11)] <- sapply(ped.exclu[,c(2,5,8,11)], as.numeric)
 
   # Return the output
