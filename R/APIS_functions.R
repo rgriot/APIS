@@ -90,7 +90,7 @@ APIS <- function(off.genotype, sire.genotype, dam.genotype, error = NULL, exclus
   cat('\n')
   cat('Assignment error rate accepted : ', error)
   cat('\n')
-  assignmentRate <- length(pedigree$sire[which(pedigree$sire != '0')]) / nrow(pedigree)
+  assignmentRate <- length(pedigree$sire[which(is.na(pedigree$sire) == F)]) / nrow(pedigree)
   AR <- substr(as.character(100 * assignmentRate), 1, 6)
   cat('Assignment rate : ', AR, '%', sep = "")
   cat('\n')
@@ -500,7 +500,7 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
     return(list.mrk[which(list.mrk[,1] == tmp), 2])
   }
 
-  variant <- unique(unlist(strsplit(as.vector(offspring), '/')))
+  variant <- unique(unlist(strsplit(as.vector(rbind(offspring, sire, dam)), '/')))
   variant <- variant[-which(variant == "NA")]
 
   variant.corres <- data.frame(variant = as.character(variant),
@@ -552,7 +552,15 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
 
   colnames(Freq) <- sapply(colnames(Freq), recodeFreq, list.mrk = variant.corres)
   Freq <- rbind(colnames(Freq), Freq)
+
+  add.freq <- as.numeric(variant.corres$recode[-which(variant.corres$recode %in% Freq[1,])])
+  add.freq <- add.freq[-which(add.freq == 0)]
+  add.freqMatrix <- matrix(data = c(add.freq, rep(0, times = length(add.freq) * (nrow(Freq) - 1))),
+                           ncol = length(add.freq), nrow = nrow(Freq), byrow = T)
+
+
   Freq <- apply(Freq, 2, as.numeric)
+  Freq <- cbind(Freq, add.freqMatrix)
   Freq <- Freq[,order(Freq[1,])]
   Freq <- Freq[-1,]
 
@@ -1081,6 +1089,19 @@ personalThreshold <- function(APIS.result, method, threshold = NULL) {
   }
 
   grid.arrange(plot_delta, plot_mendel, plot_miss, nrow = 3, ncol = 1)
+
+  # Give recommendations according to the data set and the results
+  cat('--------------------------------------', sep = '\n')
+  cat('             APIS SUMMARY', sep = '\n')
+  cat('--------------------------------------', sep = '\n')
+  cat("Method for personal threshold : ", method, sep = "")
+  cat('\n')
+  cat('Threshold : ', threshold)
+  cat('\n')
+  assignmentRate <- length(pedigree$sire[which(is.na(pedigree$sire) == F)]) / nrow(pedigree)
+  AR <- substr(as.character(100 * assignmentRate), 1, 6)
+  cat('Assignment rate : ', AR, '%', sep = "")
+  cat('\n')
 
   return(list(pedigree = pedigree, log = log, error = error, threshold = threshold))
 }
