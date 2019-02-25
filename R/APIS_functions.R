@@ -546,7 +546,7 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring)) {
   # Load the Fortran library
   cat('Load the Fortran library')
   cat('\n')
-  dyn.load("./src/APIS")
+  dyn.load("./src/APIS", PACKAGE = "APIS")
 
   # Assignment Process
   cat('Assignment')
