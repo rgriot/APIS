@@ -74,7 +74,7 @@ APIS <- function(off.genotype, sire.genotype, dam.genotype, error = NULL, exclus
   # Assign with APIS
   assignResult 	<- assignmentFortran(offspring = off.genotype,
                                      sire = sire.genotype,
-                                     am = dam.genotype,
+                                     dam = dam.genotype,
                                      thresh = exclusion.threshold,
                                      preselect.Parent = preselect.Parent)
   apisResult 		<- setThreshold(ped.log = assignResult$log.mendel, ped.exclu = assignResult$exclu, nb.mrk = assignResult$nb.mrk, error = error)
