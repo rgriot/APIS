@@ -981,7 +981,7 @@ personalThreshold <- function(APIS.result, method, threshold = NULL) {
   # Check the method
   if (method == "delta") {
     # DO the delta threshold
-    col_toKeep <- 14
+    col_toKeep <- 11
     if (is.null(threshold)) {
       return(APIS.result)
     } else {
@@ -989,9 +989,9 @@ personalThreshold <- function(APIS.result, method, threshold = NULL) {
     }
   } else if (method == "Pmendel") {
     # DO the Pmendel threshold
-    col_toKeep <- 7
+    col_toKeep <- 6
     if (is.null(threshold)) {
-      threshold <- quantile(x = log[,12], probs = (1 - error), type = 5)
+      threshold <- quantile(x = log[,10], probs = (1 - error), type = 5)
     } else {
       threshold <- threshold
     }
@@ -1071,7 +1071,7 @@ personalThreshold <- function(APIS.result, method, threshold = NULL) {
   if (method == 'delta') {
     # Add delta threshold
 
-    plot_mendel <- plot_mendel +
+    plot_delta <- plot_delta +
       geom_vline(xintercept = threshold)
 
   } else if (method == 'Pmendel') {
