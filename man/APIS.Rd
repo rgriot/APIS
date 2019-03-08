@@ -4,7 +4,7 @@
 \alias{APIS}
 \title{APIS function that assigns with observed data}
 \usage{
-APIS(off.genotype, sire.genotype, dam.genotype, error = NULL,
+APIS(off.genotype, sire.genotype, dam.genotype, error = 0,
   exclusion.threshold = ncol(off.genotype), preselect.Parent = F)
 }
 \arguments{

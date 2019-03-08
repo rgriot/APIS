@@ -26,6 +26,7 @@ knitr::opts_chunk$set(
 # Description
 This package include all the functions to assign with APIS (Griot & al., 2019).
 Parentage assignment is widely used for farmed and natural populations. As most of the likelihood software are based on simulation, the estimation of the simulation parameters is a key point for assignment reliability. Among those parameters, the proportion of missing parent is one of the most important. To avoid estimation of missing parents, we developed APIS (Auto-Adaptive Parentage Inference Software), based on observed average Mendelian transmission probabilities.
+In this package, you will find all the functions to perform parentage assign with the method described in the paper.
 
 # Install and load the package
 ```{r load_packages, include=F}
@@ -167,12 +168,20 @@ APIS function can handle 2 other parameters :
 
   * exclusion.threshold : For exclusion procedure, the number of mismatches allowed by the user. Use default value for Mendelian transmission probability procedure.
   
-  * preselect.Parent : Use of a parent preselection function based on Mendelian incompatibilities. Use default value to get the most accurate results. If a value is specified, this will increase computation time but can decrease assignment reliability.
+  * preselect.Parent : Use of a parent preselection function based on Mendelian incompatibilities.
+  
+    + Default value       : FALSE
+    
+    + One interger (n)    : Selection of n sires and n dams
+    
+    + Two integers (n, m) : Selection of n sires and m dams
+    
+  Use default value to get the most accurate results. If a value is specified, this will decrease computation time but can decrease assignment reliability.
 
 # Acknowlegments
 This work was partially financially supported in the GeneSea project (n° R FEA 4700 16 FA 100 0005) by the French Government and the European Union (EMFF, European Maritime and Fisheries Fund) at the "Appels à projets Innovants" managed by the FranceAgrimer Office. The doctoral scholarship of Ronan Griot was partially supported by the ANRT (doctoral scholarship n° 2017/0731) and SYSAAF.
 
-# Annexe
+# Annexe 
 
 ```{r info}
 print(sessionInfo(), locale=FALSE)
