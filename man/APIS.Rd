@@ -26,7 +26,7 @@ p = number of markers
 rownames(dam) = labels of dams
 marker coding = "All1/All2" example: "A/A", "A/B", "NA/NA" (for missing genotype)}
 
-\item{error}{(default: NULL) The assignment error rate accepted by the user}
+\item{error}{(default: 0) The assignment error rate accepted by the user}
 
 \item{exclusion.threshold}{(default: ncol(off.genotype)) Threshold for exclusion (number of mismatches allowed)}
 

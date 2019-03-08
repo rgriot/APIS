@@ -92,8 +92,35 @@ result <- APIS(off.genotype = off_full,
 APIS gives you 3 different outputs :
   
   * pedigree
+
+Pedigree header  | Description
+---------------- | ----------------
+*off*              | Offspring ID    
+*sire*             | Sire ID
+*dam*              | Dam ID
   
+
   * log containing Mendelian transmission probabilities, mismatches and deltas for the first 3 parent pairs
+  
+Log header      | Description
+--------------- | -----------------------------------------------------------------------------
+*offspring*       | offspring ID
+*mrk_genotype*    | number of markers genotyped
+*sire1*           | ID of the most likely sire
+*dam1*            | ID of the most likely dam
+*mismatch1*       | number of mismatches for the most likely parent pair (sire1, dam1)
+*mendel1*         | average Mendelian transmission probability of the most likely parent pair                      (sire1, dam1)
+*sire2*           | ID of the second most likely sire
+*dam2*            | ID of the second most likely dam
+*mismatch2*       | number of mismatches for the second most likely parent pair (sire2, dam2)
+*mendel2*         | average Mendelian transmission probability of the second most likely parent                     pair (sire2, dam2)
+*delta_Pmendel12* | mendel1 - mendel2
+*sire3*           | ID of the third most likely sire
+*dam3*            | ID of the third most likely dam
+*mismatch3*       | number of mismatches for the third most likely parent pair (sire3, dam3)
+*mendel3*         | average Mendelian transmission probability of the third most likely parent                     pair (sire3, dam3)
+*delta_Pmendel23* | mendel2 - mendel3
+
   
   * graphs of the distributions of deltas, Mendelian transmission probabilities and mismatches
 

@@ -318,9 +318,9 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
 
   # Create a log
   ped.log <- as.data.frame(t(as.data.frame(lapply(A, function(X) {t <- X[[1]]}))))
-  colnames(ped.log) <- c('offspring', 'mrk_genotype', 'sire1', 'dam1', 'miss1', 'mendel1',
-                         'sire2', 'dam2', 'miss2', 'mendel2', 'delta_Pmendel12',
-                         'sire3', 'dam3', 'miss3', 'mendel3', 'delta_Pmendel23')
+  colnames(ped.log) <- c('offspring', 'mrk_genotype', 'sire1', 'dam1', 'mismatch1', 'mendel1',
+                         'sire2', 'dam2', 'mismatch2', 'mendel2', 'delta_Pmendel12',
+                         'sire3', 'dam3', 'mismatch3', 'mendel3', 'delta_Pmendel23')
   rownames(ped.log) <- c(1:nrow(ped.log))
 
   ped.log[,] <- sapply(ped.log[,c(1:ncol(ped.log))], as.character)
@@ -328,9 +328,9 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
 
   # Create a data frame from results by exclusion
   ped.exclu <- as.data.frame(t(as.data.frame(lapply(A, function(X) {t <- X[[2]]}))))
-  colnames(ped.exclu) <- c('off', 'mrk_genotype','sire1', 'dam1', 'miss1',
-                           'sire2', 'dam2', 'miss2',
-                           'sire3', 'dam3', 'miss3')
+  colnames(ped.exclu) <- c('off', 'mrk_genotype','sire1', 'dam1', 'mismatch1',
+                           'sire2', 'dam2', 'mismatch2',
+                           'sire3', 'dam3', 'mismatch3')
   rownames(ped.exclu) <- c(1:nrow(ped.exclu))
   ped.exclu[,c(2,5,8,11)] <- sapply(ped.exclu[,c(2,5,8,11)], as.numeric)
 
@@ -594,7 +594,12 @@ assignmentPower <- function(sire, dam) {
 
   col <- which(colnames(freq)=='tot')
   freq.calc <- as.data.frame(freq[,((col+1):ncol(freq))])
-  freq.calc <- freq.calc[,-which(colnames(freq.calc) == "Freq_NA")]
+
+  test.NA <- which(colnames(freq.calc) == "Freq_NA")
+
+  if (length(test.NA) != 0) {
+    freq.calc <- freq.calc[,-test.NA]
+  }
 
   mcol <- ncol(freq.calc)
 
