@@ -388,11 +388,11 @@ setThreshold <- function(ped.log, ped.exclu, nb.mrk, error = NULL) {
                             P = rep(c("delta1", "delta2"), times = nrow(ped.log)))
 
   miss <- rep(NA, times = 2*nrow(ped.log))
-  miss[seq(1, length(miss), 2)] <- ped.log$miss1
-  miss[seq(2, length(miss), 2)] <- ped.log$miss2
+  miss[seq(1, length(miss), 2)] <- ped.log$mismatch1
+  miss[seq(2, length(miss), 2)] <- ped.log$mismatch2
 
   data.miss <- data.frame(miss = miss,
-                           P = rep(c("miss1", "miss2"), times = nrow(ped.log)))
+                           P = rep(c("mismatch1", "mismatch2"), times = nrow(ped.log)))
 
   if (is.null(error)) {
     error <- as.numeric(readline(prompt = 'What assignment error rate do you accept : '))
@@ -501,8 +501,8 @@ setThreshold <- function(ped.log, ped.exclu, nb.mrk, error = NULL) {
     guides(fill = guide_legend(title = "Delta"))
 
   plot_miss <- ggplot(data = data.miss, aes(x = miss, fill = P)) +
-    geom_histogram(data = subset(data.miss, P == 'miss2'), bins = 30) +
-    geom_histogram(data = subset(data.miss, P == 'miss1'), alpha = 0.8, bins = 30) +
+    geom_histogram(data = subset(data.miss, P == 'mismatch2'), bins = 30) +
+    geom_histogram(data = subset(data.miss, P == 'mismatch1'), alpha = 0.8, bins = 30) +
     xlab(label = "number of mismatches") +
     ylab(label = "number of individuals") +
     theme(axis.title.x = element_text(margin = margin(20, 0, 0, 0))) +
@@ -707,11 +707,11 @@ personalThreshold <- function(APIS.result, method, threshold = NULL) {
                            P = rep(c("delta1", "delta2"), times = nrow(log)))
 
   miss <- rep(NA, times = 2*nrow(log))
-  miss[seq(1, length(miss), 2)] <- log$miss1
-  miss[seq(2, length(miss), 2)] <- log$miss2
+  miss[seq(1, length(miss), 2)] <- log$mismatch1
+  miss[seq(2, length(miss), 2)] <- log$mismatch2
 
   data.miss <- data.frame(miss = miss,
-                          P = rep(c("miss1", "miss2"), times = nrow(log)))
+                          P = rep(c("mismatch1", "mismatch2"), times = nrow(log)))
 
   plot_mendel <- ggplot(data = data.mendel, aes(x = mendel, fill = P)) +
     geom_histogram(data = subset(data.mendel, P == 'P2'), bins = 30) +
@@ -732,8 +732,8 @@ personalThreshold <- function(APIS.result, method, threshold = NULL) {
     guides(fill = guide_legend(title = "Delta"))
 
   plot_miss <- ggplot(data = data.miss, aes(x = miss, fill = P)) +
-    geom_histogram(data = subset(data.miss, P == 'miss2'), bins = 30) +
-    geom_histogram(data = subset(data.miss, P == 'miss1'), alpha = 0.8, bins = 30) +
+    geom_histogram(data = subset(data.miss, P == 'mismatch2'), bins = 30) +
+    geom_histogram(data = subset(data.miss, P == 'mismatch1'), alpha = 0.8, bins = 30) +
     xlab(label = "number of mismatches") +
     ylab(label = "number of individuals") +
     theme(axis.title.x = element_text(margin = margin(20, 0, 0, 0))) +
