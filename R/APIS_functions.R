@@ -210,6 +210,20 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
 
   cat('\n')
 
+  if (class(recode.off) != "matrix") {
+    recode.off <- t(as.matrix(recode.off))
+  } else {
+  }
+  if (class(recode.sire) != "matrix") {
+    recode.sire <- t(as.matrix(recode.sire))
+  } else {
+  }
+
+  if (class(recode.dam) != "matrix") {
+    recode.dam <- t(as.matrix(recode.dam))
+  } else {
+  }
+
   rownames(recode.off) <- rownames(offspring)
   rownames(recode.sire) <- rownames(sire)
   rownames(recode.dam) <- rownames(dam)
