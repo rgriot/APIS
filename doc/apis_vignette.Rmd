@@ -30,6 +30,7 @@ In this package, you will find all the functions to perform parentage assign wit
 
 # Install and load the package
 ```{r}
+install_github("rgriot/APIS", dependencies = T, INSTALL_opts = c("--no-lock"))
 library(APIS)
 ```
 

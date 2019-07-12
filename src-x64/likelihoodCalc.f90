@@ -1,7 +1,6 @@
 subroutine likelihoodCalculation(offGeno, sires, dams, nMrk, nVariant, nSires, nDams, F, &
 																 output_sires, output_dams, output_score, output_miss)
 
-	!DEC$ ATTRIBUTES DLLEXPORT :: likelihoodCalculation
 	integer			 															:: nMrk, nSires, nDams, sID, dID
 	integer            												:: i, j, k, line
 	double precision, parameter    						:: e = 0.01
