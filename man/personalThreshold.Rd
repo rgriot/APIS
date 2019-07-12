@@ -21,11 +21,13 @@ new pedigree from the new threshold
 This function allows the user to set up his own threshold
 }
 \examples{
-data("genotype_APIS")
+data("APIS_offspring")
+data("APIS_sire")
+data("APIS_dam")
 
-result <- APIS(off.genotype = off_full,
-               sire.genotype = sire_full,
-               dam.genotype = dam_full,
+result <- APIS(off.genotype = APIS_offspring,
+               sire.genotype = APIS_sire,
+               dam.genotype = APIS_dam,
                error = 0.05)
 
 new.result <- personalThreshold(result, method = 'Pmendel')

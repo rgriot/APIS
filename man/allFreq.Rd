@@ -18,8 +18,8 @@ allele frequencies
 This function estimates allele frequencies
 }
 \examples{
-data("genotype_APIS")
-freq <- allFreq(off)
+data("APIS_offspring")
+freq <- allFreq(APIS_offspring)
 }
 \keyword{allele}
 \keyword{frequencies}

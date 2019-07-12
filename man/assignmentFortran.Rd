@@ -34,4 +34,11 @@ log file for exclusion
 \description{
 This function calculates the average Mendelian transmission probabilities
 }
+\examples{
+data("APIS_offspring")
+data("APIS_sire")
+data("APIS_dam")
+
+assignment <- assignmentFortran(APIS_offspring, APIS_sire, APIS_dam)
+}
 \keyword{assignment}

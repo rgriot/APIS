@@ -29,10 +29,10 @@ Parentage assignment is widely used for farmed and natural populations. As most 
 In this package, you will find all the functions to perform parentage assign with the method described in the paper.
 
 # Install and load the package
-```{r load_packages, include=F}
-devtools::install_github("rgriot/APIS")
+```{r}
 library(APIS)
 ```
+
 ```{r, eval=F}
 devtools::install_github("rgriot/APIS")
 library(APIS)
@@ -51,10 +51,12 @@ APIS requires matrices of characters as inputs.
 Each matrix has individuals as rows, markers as columns. The individual labels are set as rownames. Each cell is the genotype of one marker, coded "All1/All2". For example "A/A", "A/B", "B/B" for bi-allelic markers and "NA/NA" for missing value. For multi-allelic markers, use the generic coding "All1/All2".
 
 ```{r}
-data("genotype_APIS")
+data("APIS_offspring")
+data("APIS_sire")
+data("APIS_dam")
 
-head(off_full[,1:10])
-rownames(off_full[1:6,])
+head(APIS_offspring[,1:10])
+rownames(APIS_offspring[1:6,])
 ```
 
 \newpage
@@ -71,9 +73,9 @@ APIS main function requires 4 inputs :
   * error = accepted assignment error rate (What is the maximum error rate I accept in my assignment results ?)
 
 ```{r}
-head(off_full[,1:10])
-head(sire_full[,1:10])
-head(dam_full[,1:10])
+head(APIS_offspring[,1:10])
+head(APIS_sire[,1:10])
+head(APIS_dam[,1:10])
 error <- 0.05 #I accept 5% of errors in the results
 ```
 
@@ -82,9 +84,9 @@ The main function to perform parentage assignment with APIS the "APIS" function.
 Use the function as below, with default parameters for exclusion threshold and preselection of parents for maximizing the reliability.
 
 ```{r, eval = F}
-result <- APIS(off.genotype = off_full,
-               sire.genotype = sire_full,
-               dam.genotype = dam_full,
+result <- APIS(off.genotype = APIS_offspring,
+               sire.genotype = APIS_sire,
+               dam.genotype = APIS_dam,
                error = error)
 ```
 
@@ -144,21 +146,19 @@ new.result <- personalThreshold(APIS.result = result,
 
 # Examples
 ## Full data
-This example uses the full data provided by the package (Figure 1).
+This example uses 100 markers data provided by the package.
+This example set is from Griot & al, (2019)
 
-```{r, eval = F}
-result <- APIS(off.genotype = off_full,
-               sire.genotype = sire_full,
-               dam.genotype = dam_full,
+```{r, eval = T}
+result <- APIS(off.genotype = APIS_offspring,
+               sire.genotype = APIS_sire,
+               dam.genotype = APIS_dam,
                error = 0.05)
-```
-```{r , echo=FALSE, fig.cap="APIS outputs calculated on 1000 offspring from 10 sires and 10 dams, genotyped on 400 markers", out.width = '70%', fig.align='center'}
-knitr::include_graphics('D:/Data_RG/package_APIS/APIS/vignettes/fulldata_APIS.png')
 ```
 
 When I look at the mismatch distributions, I prefer to use exclusion and allow for 5 mismatches (Figure 2).
 
-```{r, eval = F}
+```{r, eval = T}
 new.result <- personalThreshold(APIS.result = result,
                                 method = 'exclusion',
                                 threshold = 5)
@@ -166,19 +166,15 @@ new.result <- personalThreshold(APIS.result = result,
 
 \newpage
 
-```{r , echo=FALSE, fig.cap="APIS outputs based on mismatches calculated on 1000 offspring from 10 sires and 10 dams, genotyped on 400 markers", out.width = '70%', fig.align='center'}
-knitr::include_graphics('D:/Data_RG/package_APIS/APIS/vignettes/fulldata_mismatch.png')
-```
-
-\newpage
-
 ## Degraded data
-This example uses the degraded data provided by the package (Figure 3).
+This example uses 35 markers from the example set provided by the package.
 
-```{r, eval = F}
-result <- APIS(off.genotype = off_degraded,
-               sire.genotype = sire_degraded,
-               dam.genotype = dam_degraded,
+If you want to use similar power as those used in Griot & al, (2019), you can subet the 35, 42 or 50 first markers to reach a power of 0.90, 0.95, 0.99.
+
+```{r, eval = T}
+result <- APIS(off.genotype = APIS_offspring[, 1:35],
+               sire.genotype = APIS_sire[, 1:35],
+               dam.genotype = APIS_dam[, 1:35],
                error = 0.05)
 ```
 In this situation, the theoretical assignment power is low and there are missing parents.
@@ -186,9 +182,6 @@ The distribution graphs do not give you more information about a new threshold v
 
 Thus, the better answer is to keep APIS results.
 
-```{r , echo=FALSE, fig.cap="APIS outputs calculated on 1000 offspring from 5 sires (5 missing sires) and 10 dams, genotyped on 50 markers", out.width = '70%', fig.align='center'}
-knitr::include_graphics('D:/Data_RG/package_APIS/APIS/vignettes/degradeddata_APIS.png')
-```
 
 # Other parameters of APIS function
 APIS function can handle 2 other parameters :

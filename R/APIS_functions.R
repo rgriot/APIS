@@ -22,11 +22,21 @@
 #' @keywords assignment APIS
 #' @return pedigree
 #' @return a log file
-#' @examples data("genotype_APIS")
+#' @useDynLib APIS
+#' @import doSNOW
+#' @import foreach
+#' @import parallel
+#' @import doParallel
+#' @import ggplot2
+#' @import gridExtra
+#' @examples
+#' data("APIS_offspring")
+#' data("APIS_sire")
+#' data("APIS_dam")
 #'
-#' result <- APIS(off.genotype = off_full,
-#'                sire.genotype = sire_full,
-#'                dam.genotype = dam_full,
+#' result <- APIS(off.genotype = APIS_offspring,
+#'                sire.genotype = APIS_sire,
+#'                dam.genotype = APIS_dam,
 #'                error = 0.05)
 #' @export
 APIS <- function(off.genotype, sire.genotype, dam.genotype, error = 0, exclusion.threshold = ncol(off.genotype), preselect.Parent = F) {
@@ -50,11 +60,27 @@ APIS <- function(off.genotype, sire.genotype, dam.genotype, error = 0, exclusion
   }
 
   # Check if the user-defined assignment error rate limit is a percentage
-  if ((0 <= error) && (error <= 100)) {
+  if ((0 <= error) && (error <= 100) && (is.numeric(error))) {
     cat("assignment error rate : OK")
     cat('\n')
   } else {
     stop("The assignment error rate limit is NEGATIVE")
+  }
+
+  # Check if all offspring markers have at least one genotype
+  offspring.markerGeno <- apply(off.genotype, 2, function(X) {if (length(X[which(X == "NA/NA")]) == length(X)) {
+    return(T)
+  } else {
+    return(F)
+  }})
+
+  marker_nonGeno <- which(offspring.markerGeno == T)
+  if (length(marker_nonGeno) == 0) {
+    cat("All the markers are genotyped")
+    cat('\n')
+  } else {
+    off.genotype <- off.genotype[, -marker_nonGeno]
+    cat(paste0("marker(s) ", marker_nonGeno, "have not genotypes "))
   }
 
 
@@ -118,8 +144,19 @@ APIS <- function(off.genotype, sire.genotype, dam.genotype, error = 0, exclusion
 #' @return intermidiate pedigree
 #' @return log file for Mendelian transmission probabilities
 #' @return log file for exclusion
-#' @example data(genotype_APIS)
-#' assignment <- assignmentFortran(off_full, sire_full, dam_full)
+#' @useDynLib APIS
+#' @import doSNOW
+#' @import foreach
+#' @import parallel
+#' @import doParallel
+#' @importFrom "stats" "median" "quantile"
+#' @importFrom "utils" "setTxtProgressBar" "txtProgressBar"
+#' @examples
+#' data("APIS_offspring")
+#' data("APIS_sire")
+#' data("APIS_dam")
+#'
+#' assignment <- assignmentFortran(APIS_offspring, APIS_sire, APIS_dam)
 #' @export
 assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), preselect.Parent = F) {
 
@@ -175,8 +212,8 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
   variant.corres$variant <- as.character(variant.corres$variant)
   variant.corres <- rbind(variant.corres, c(as.character("NA"), 0))
 
-  cl <- makeCluster(detectCores() - 1)
-  registerDoSNOW(cl)
+  cl <- parallel::makeCluster(parallel::detectCores() - 2)
+  doSNOW::registerDoSNOW(cl)
 
   pb.recodeOff <- txtProgressBar(min = 0, max = iterations, char = '><> ', style = 3)
   progress <- function(n) {setTxtProgressBar(pb.recodeOff, n)}
@@ -206,7 +243,7 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
     tmp <- as.numeric(as.vector(sapply(dam[i,, drop = F], recodeFortran, list.mrk = variant.corres)))
   }
 
-  stopCluster(cl)
+  parallel::stopCluster(cl)
 
   cat('\n')
 
@@ -250,15 +287,15 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
   cat('\n')
 
   # Set up the cluster for parallel iteration
-  cl <- makeCluster(detectCores() - 1)
-  registerDoSNOW(cl)
+  cl <- parallel::makeCluster(parallel::detectCores() - 2)
+  doSNOW::registerDoSNOW(cl)
 
-  pb.assignment <- txtProgressBar(min = 0, max = iterations, char = "><(((°> ", style = 3)
+  pb.assignment <- txtProgressBar(min = 0, max = iterations, char = "><(((*> ", style = 3)
   progress <- function(n) {setTxtProgressBar(pb.assignment, n)}
   opts <- list(progress = progress)
 
   A <- foreach(off = 1:iterations, .multicombine = T,
-               .packages = c('foreach', 'doParallel', 'doSNOW', 'APIS'), .options.snow = opts) %dopar% { # For each offspring
+               .packages = c('foreach', 'doParallel', 'doSNOW'), .options.snow = opts) %dopar% { # For each offspring
 
                  tmp <- recode.off[off,]
 
@@ -282,7 +319,7 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
                  res[,1] <- rep(potential.sire, each = length(potential.dam))
                  res[,2] <- rep(potential.dam, times = length(potential.sire))
 
-                 # Prepare Frotran inputs
+                 # Prepare Fortran inputs
                  nMrk         = as.integer(x.col)
                  nSires       = as.integer(length(potential.sire))
                  nDams        = as.integer(length(potential.dam))
@@ -292,7 +329,7 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
                  output_score = vector(mode = 'numeric', length = nSires*nDams)
                  output_miss  = vector(mode = 'numeric', length = nSires*nDams)
 
-                 outputFortran <- .Fortran("likelihoodcalculation", as.integer(tmp), as.integer(tmp.sire),
+                 outputFortran <- .Fortran("likelihoodCalculation", as.integer(tmp), as.integer(tmp.sire),
                                            as.integer(tmp.dam), as.integer(nMrk), as.integer(nVariant), as.integer(nSires), as.integer(nDams),
                                            as.double(Freq), output_sires, output_dams, as.double(output_score), as.integer(output_miss))
 
@@ -326,7 +363,7 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
                  a <- list(out.log, out.exclu)
                }
 
-  stopCluster(cl)
+  parallel::stopCluster(cl)
 
   cat('\n')
 
@@ -366,6 +403,9 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
 #' @keywords assignment
 #' @return pedigree
 #' @return log file
+#' @import ggplot2
+#' @import gridExtra
+#' @importFrom "stats" "median" "quantile"
 #' @export
 setThreshold <- function(ped.log, ped.exclu, nb.mrk, error = NULL) {
 
@@ -495,7 +535,7 @@ setThreshold <- function(ped.log, ped.exclu, nb.mrk, error = NULL) {
   ped.final <- ped.final[,-4]
 
   # Plot the distributions
-  plot_mendel <- ggplot(data = data.mendel, aes(x = mendel, fill = P)) +
+  plot_mendel <- ggplot2::ggplot(data = data.mendel, aes(x = mendel, fill = P)) +
     geom_histogram(data = subset(data.mendel, P == 'P2'), bins = 30) +
     geom_histogram(data = subset(data.mendel, P == 'P1'), alpha = 0.8, bins = 30) +
     xlab(label = "average Mendelian tranmission probability") +
@@ -504,7 +544,7 @@ setThreshold <- function(ped.log, ped.exclu, nb.mrk, error = NULL) {
     theme(axis.title.y = element_text(margin = margin(0, 20, 0, 0))) +
     guides(fill = guide_legend(title = "Mendelian probability"))
 
-  plot_delta <- ggplot(data = data.delta, aes(x = delta, fill = P)) +
+  plot_delta <- ggplot2::ggplot(data = data.delta, aes(x = delta, fill = P)) +
     geom_histogram(data = subset(data.delta, P == 'delta2'), bins = 30) +
     geom_histogram(data = subset(data.delta, P == 'delta1'), alpha = 0.8, bins = 30) +
     geom_vline(xintercept = thresh.mendel) +
@@ -514,7 +554,7 @@ setThreshold <- function(ped.log, ped.exclu, nb.mrk, error = NULL) {
     theme(axis.title.y = element_text(margin = margin(0, 20, 0, 0))) +
     guides(fill = guide_legend(title = "Delta"))
 
-  plot_miss <- ggplot(data = data.miss, aes(x = miss, fill = P)) +
+  plot_miss <- ggplot2::ggplot(data = data.miss, aes(x = miss, fill = P)) +
     geom_histogram(data = subset(data.miss, P == 'mismatch2'), bins = 30) +
     geom_histogram(data = subset(data.miss, P == 'mismatch1'), alpha = 0.8, bins = 30) +
     xlab(label = "number of mismatches") +
@@ -523,7 +563,7 @@ setThreshold <- function(ped.log, ped.exclu, nb.mrk, error = NULL) {
     theme(axis.title.y = element_text(margin = margin(0, 20, 0, 0))) +
     guides(fill = guide_legend(title = "missmatches"))
 
-  grid.arrange(plot_delta, plot_mendel, plot_miss, nrow = 3, ncol = 1)
+  gridExtra::grid.arrange(plot_delta, plot_mendel, plot_miss, nrow = 3, ncol = 1)
 
   # Return the output
   return(list(pedigree = ped.final, log = ped.log, error = error))
@@ -537,8 +577,10 @@ setThreshold <- function(ped.log, ped.exclu, nb.mrk, error = NULL) {
 #' n = number of individuals
 #' p = number of markers (coded as "All1/All2", ex: "A/A" or "NA/NA" for missing genotype)
 #' @keywords allele frequencies
-#' @examples data("genotype_APIS")
-#' freq <- allFreq(off)
+#' @examples
+#' data("APIS_offspring")
+
+#' freq <- allFreq(APIS_offspring)
 #' @return allele frequencies
 #' @export
 allFreq <- function(genotype) {
@@ -593,8 +635,10 @@ allFreq <- function(genotype) {
 #' rownames(dam) = labels of dams
 #' marker coding = "All1/All2" example: "A/A", "A/B", "NA/NA" (for missing genotype)
 #' @return Theoretical assignment power of the marker set
-#' @examples data("genotype_APIS")
-#' assignmentPower(sire_full, dam_full)
+#' @examples
+#' data("APIS_sire")
+#' data("APIS_dam")
+#' assignmentPower(APIS_sire, APIS_dam)
 #' @keywords assignment exclusion power
 #' @export
 assignmentPower <- function(sire, dam) {
@@ -648,15 +692,21 @@ assignmentPower <- function(sire, dam) {
 #' 'Pmendel' for Mendelian porbabilities, 'exclusion' for mismatches
 #' @param threshold personal threshold | default values are implemented
 #' @return new pedigree from the new threshold
-#' @examples data("genotype_APIS")
+#' @examples
+#' data("APIS_offspring")
+#' data("APIS_sire")
+#' data("APIS_dam")
 #'
-#' result <- APIS(off.genotype = off_full,
-#'                sire.genotype = sire_full,
-#'                dam.genotype = dam_full,
+#' result <- APIS(off.genotype = APIS_offspring,
+#'                sire.genotype = APIS_sire,
+#'                dam.genotype = APIS_dam,
 #'                error = 0.05)
 #'
 #' new.result <- personalThreshold(result, method = 'Pmendel')
 #' @keywords assignment APIS threshold
+#' @import ggplot2
+#' @import gridExtra
+#' @importFrom "stats" "median" "quantile"
 #' @export
 personalThreshold <- function(APIS.result, method, threshold = NULL) {
   # Get the result
@@ -727,7 +777,7 @@ personalThreshold <- function(APIS.result, method, threshold = NULL) {
   data.miss <- data.frame(miss = miss,
                           P = rep(c("mismatch1", "mismatch2"), times = nrow(log)))
 
-  plot_mendel <- ggplot(data = data.mendel, aes(x = mendel, fill = P)) +
+  plot_mendel <- ggplot2::ggplot(data = data.mendel, aes(x = mendel, fill = P)) +
     geom_histogram(data = subset(data.mendel, P == 'P2'), bins = 30) +
     geom_histogram(data = subset(data.mendel, P == 'P1'), alpha = 0.8, bins = 30) +
     xlab(label = "average Mendelian tranmission probability") +
@@ -736,7 +786,7 @@ personalThreshold <- function(APIS.result, method, threshold = NULL) {
     theme(axis.title.y = element_text(margin = margin(0, 20, 0, 0))) +
     guides(fill = guide_legend(title = "Mendelian probability"))
 
-  plot_delta <- ggplot(data = data.delta, aes(x = delta, fill = P)) +
+  plot_delta <- ggplot2::ggplot(data = data.delta, aes(x = delta, fill = P)) +
     geom_histogram(data = subset(data.delta, P == 'delta2'), bins = 30) +
     geom_histogram(data = subset(data.delta, P == 'delta1'), alpha = 0.8, bins = 30) +
     xlab(label = "delta") +
@@ -745,7 +795,7 @@ personalThreshold <- function(APIS.result, method, threshold = NULL) {
     theme(axis.title.y = element_text(margin = margin(0, 20, 0, 0))) +
     guides(fill = guide_legend(title = "Delta"))
 
-  plot_miss <- ggplot(data = data.miss, aes(x = miss, fill = P)) +
+  plot_miss <- ggplot2::ggplot(data = data.miss, aes(x = miss, fill = P)) +
     geom_histogram(data = subset(data.miss, P == 'mismatch2'), bins = 30) +
     geom_histogram(data = subset(data.miss, P == 'mismatch1'), alpha = 0.8, bins = 30) +
     xlab(label = "number of mismatches") +
@@ -774,7 +824,7 @@ personalThreshold <- function(APIS.result, method, threshold = NULL) {
 
   }
 
-  grid.arrange(plot_delta, plot_mendel, plot_miss, nrow = 3, ncol = 1)
+  gridExtra::grid.arrange(plot_delta, plot_mendel, plot_miss, nrow = 3, ncol = 1)
 
   # Give recommendations according to the data set and the results
   cat('--------------------------------------', sep = '\n')
