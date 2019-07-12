@@ -30,12 +30,8 @@ In this package, you will find all the functions to perform parentage assign wit
 
 # Install and load the package
 ```{r}
-install_github("rgriot/APIS", dependencies = T, INSTALL_opts = c("--no-lock"))
-library(APIS)
-```
-
-```{r, eval=F}
-devtools::install_github("rgriot/APIS")
+library(devtools)
+install_github("rgriot/APIS", dependencies = T)
 library(APIS)
 ```
 
@@ -142,27 +138,29 @@ If you want to set up your threshold on mismatches, use :
 ```{r, eval = F}
 new.result <- personalThreshold(APIS.result = result,
                                 method = 'exclusion',
-                                threshold = 5)
+                                threshold = 1)
 ```
+\newpage
 
 # Examples
 ## Full data
-This example uses 100 markers data provided by the package.
+This example uses the 100 markers data sets provided by the package.
 This example set is from Griot & al, (2019)
 
-```{r, eval = T}
+```{r full_data, echo = F, message = F, warning = F, results = "hide"}
 result <- APIS(off.genotype = APIS_offspring,
                sire.genotype = APIS_sire,
                dam.genotype = APIS_dam,
                error = 0.05)
 ```
 
-When I look at the mismatch distributions, I prefer to use exclusion and allow for 5 mismatches (Figure 2).
+
+When I look at the mismatch distributions, I prefer to use exclusion and allow for 1 mismatches (Figure 2).
 
 ```{r, eval = T}
 new.result <- personalThreshold(APIS.result = result,
                                 method = 'exclusion',
-                                threshold = 5)
+                                threshold = 1)
 ```
 
 \newpage
@@ -172,16 +170,17 @@ This example uses 35 markers from the example set provided by the package.
 
 If you want to use similar power as those used in Griot & al, (2019), you can subet the 35, 42 or 50 first markers to reach a power of 0.90, 0.95, 0.99.
 
-```{r, eval = T}
+```{r degraded_data, echo = F, message = F, warning = F, results = "hide"}
 result <- APIS(off.genotype = APIS_offspring[, 1:35],
-               sire.genotype = APIS_sire[, 1:35],
+               sire.genotype = APIS_sire[sample(c(1:nrow(APIS_sire)), 10), 1:35],
                dam.genotype = APIS_dam[, 1:35],
                error = 0.05)
 ```
+
 In this situation, the theoretical assignment power is low and there are missing parents.
 The distribution graphs do not give you more information about a new threshold value.
 
-Thus, the better answer is to keep APIS results.
+Thus, the better option is to keep APIS results.
 
 
 # Other parameters of APIS function
