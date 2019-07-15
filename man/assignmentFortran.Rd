@@ -5,7 +5,7 @@
 \title{Assignment function to obtain the average Mendelian transmission probabilities using a Fortran library}
 \usage{
 assignmentFortran(offspring, sire, dam, thresh = ncol(offspring),
-  preselect.Parent = F)
+  preselect.Parent = F, nb.cores = 2)
 }
 \arguments{
 \item{offspring}{Offspring genotypes | Matrix (n*p) where n = number of individuals, p = number of markers
@@ -23,6 +23,8 @@ marker coding = "All1/All2" example: "A/A", "A/B", "NA/NA" (for missing genotype
 \item{thresh}{(default: ncol(offspring) Threshold for exclusion (number of mismatches allowed)}
 
 \item{preselect.Parent}{(default: FALSE) Preselection of parents. Can be FALSE, an integer or a vector of two integers (number of sires, numbers of dams)}
+
+\item{nb.cores}{(default: 2) Number of cores to use. If you have more than 2 cores, you can use the "parallel" function detectCores()}
 }
 \value{
 intermidiate pedigree

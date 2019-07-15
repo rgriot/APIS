@@ -19,6 +19,7 @@
 #' @param error (default: 0) The assignment error rate accepted by the user
 #' @param exclusion.threshold (default: ncol(off.genotype)) Threshold for exclusion (number of mismatches allowed)
 #' @param preselect.Parent (default: FALSE) Preselection of parents. Can be FALSE, an integer or a vector of two integers (number of sires, numbers of dams)
+#' @param nb.cores (default: 2) Number of cores to use. If you have more than 2 cores, you can use the "parallel" function detectCores()
 #' @keywords assignment APIS
 #' @return pedigree
 #' @return a log file
@@ -39,7 +40,8 @@
 #'                dam.genotype = APIS_dam,
 #'                error = 0.05)
 #' @export
-APIS <- function(off.genotype, sire.genotype, dam.genotype, error = 0, exclusion.threshold = ncol(off.genotype), preselect.Parent = F) {
+APIS <- function(off.genotype, sire.genotype, dam.genotype, error = 0,
+                 exclusion.threshold = ncol(off.genotype), preselect.Parent = F, nb.cores = 2) {
 
   # Check inputs
 
@@ -102,7 +104,8 @@ APIS <- function(off.genotype, sire.genotype, dam.genotype, error = 0, exclusion
                                      sire = sire.genotype,
                                      dam = dam.genotype,
                                      thresh = exclusion.threshold,
-                                     preselect.Parent = preselect.Parent)
+                                     preselect.Parent = preselect.Parent,
+                                     nb.cores = nb.cores)
   apisResult 		<- setThreshold(ped.log = assignResult$log.mendel, ped.exclu = assignResult$exclu, nb.mrk = assignResult$nb.mrk, error = error)
 
   pedigree 	<- apisResult$pedigree
@@ -140,6 +143,7 @@ APIS <- function(off.genotype, sire.genotype, dam.genotype, error = 0, exclusion
 #' marker coding = "All1/All2" example: "A/A", "A/B", "NA/NA" (for missing genotype)
 #' @param thresh (default: ncol(offspring) Threshold for exclusion (number of mismatches allowed)
 #' @param preselect.Parent (default: FALSE) Preselection of parents. Can be FALSE, an integer or a vector of two integers (number of sires, numbers of dams)
+#' @param nb.cores (default: 2) Number of cores to use. If you have more than 2 cores, you can use the "parallel" function detectCores()
 #' @keywords assignment
 #' @return intermidiate pedigree
 #' @return log file for Mendelian transmission probabilities
@@ -158,7 +162,8 @@ APIS <- function(off.genotype, sire.genotype, dam.genotype, error = 0, exclusion
 #'
 #' assignment <- assignmentFortran(APIS_offspring, APIS_sire, APIS_dam)
 #' @export
-assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), preselect.Parent = F) {
+assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring),
+                              preselect.Parent = F, nb.cores = 2) {
 
   # DESCRIPTION
   # Function to calculate average Mendelian transmission probabilities
@@ -215,11 +220,7 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
   variant.corres$variant <- as.character(variant.corres$variant)
   variant.corres <- rbind(variant.corres, c(as.character("NA"), 0))
 
-  if (parallel::detectCores() - 2 <= 1) {
-    cl <- parallel::makeCluster(1)
-  } else {
-    cl <- parallel::makeCluster(parallel::detectCores() - 2)
-  }
+  cl <- parallel::makeCluster(nb.cores)
 
   doSNOW::registerDoSNOW(cl)
 
@@ -295,7 +296,7 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
   cat('\n')
 
   # Set up the cluster for parallel iteration
-  cl <- parallel::makeCluster(2)
+  cl <- parallel::makeCluster(nb.cores)
   doSNOW::registerDoSNOW(cl)
 
   pb.assignment <- txtProgressBar(min = 0, max = iterations, char = "><(((*> ", style = 3)

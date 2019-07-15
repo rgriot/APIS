@@ -29,7 +29,7 @@ Parentage assignment is widely used for farmed and natural populations. As most 
 In this package, you will find all the functions to perform parentage assign with the method described in the paper.
 
 # Install and load the package
-```{r}
+```{r, message=F, warning=F}
 library(devtools)
 install_github("rgriot/APIS", dependencies = T)
 library(APIS)
@@ -196,7 +196,9 @@ APIS function can handle 2 other parameters :
     
     + Two integers (n, m) : Selection of n sires and m dams
     
-  Use default value to get the most accurate results. If a value is specified, this will decrease computation time but can decrease assignment reliability.
+  * nb.cores : Number of cores to use. By default, only 2 cores are used. If your computer has more cores, you can use the function detectCores() from "parallel" package (Warnings: Do not use all the available cores, if your computer has 8 cores, only use 6 or 7 for the analysis)
+    
+  Use default value to get the most accurate results (except for the number of cores). If a value is specified, this will decrease computation time but can decrease assignment reliability.
 
 # Acknowlegments
 This work was partially financially supported in the GeneSea project (n° R FEA 4700 16 FA 100 0005) by the French Government and the European Union (EMFF, European Maritime and Fisheries Fund) at the "Appels à projets Innovants" managed by the FranceAgrimer Office. The doctoral scholarship of Ronan Griot was partially supported by the ANRT (doctoral scholarship n° 2017/0731) and SYSAAF.
