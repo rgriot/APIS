@@ -220,6 +220,8 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring),
   variant.corres$variant <- as.character(variant.corres$variant)
   variant.corres <- rbind(variant.corres, c(as.character("NA"), 0))
 
+  cat("Number of cores used :", nb.cores)
+  cat("\n")
   cl <- parallel::makeCluster(nb.cores)
 
   doSNOW::registerDoSNOW(cl)
