@@ -173,6 +173,9 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
 
   # Parameters
   e <- 0.01 # Genotyping error of 1%
+  i <- NULL
+  off <- NULL
+  P <- NULL
 
   # Estimate allele frequencies
   cat('Estimation of allele frequencies')
@@ -212,7 +215,12 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
   variant.corres$variant <- as.character(variant.corres$variant)
   variant.corres <- rbind(variant.corres, c(as.character("NA"), 0))
 
-  cl <- parallel::makeCluster(parallel::detectCores() - 2)
+  if (parallel::detectCores() - 2 <= 1) {
+    cl <- parallel::makeCluster(1)
+  } else {
+    cl <- parallel::makeCluster(parallel::detectCores() - 2)
+  }
+
   doSNOW::registerDoSNOW(cl)
 
   pb.recodeOff <- txtProgressBar(min = 0, max = iterations, char = '><> ', style = 3)
@@ -287,7 +295,7 @@ assignmentFortran <- function(offspring, sire, dam, thresh = ncol(offspring), pr
   cat('\n')
 
   # Set up the cluster for parallel iteration
-  cl <- parallel::makeCluster(parallel::detectCores() - 2)
+  cl <- parallel::makeCluster(2)
   doSNOW::registerDoSNOW(cl)
 
   pb.assignment <- txtProgressBar(min = 0, max = iterations, char = "><(((*> ", style = 3)
@@ -421,6 +429,7 @@ setThreshold <- function(ped.log, ped.exclu, nb.mrk, error = NULL) {
   cat('AUTO-ADAPTIVE PARENTAGE INFERENCE SOFTWARE', sep = '\n')
   cat('---------------------------------------------------', sep = '\n')
 
+  P <- NULL
   # Create the pedigree output
   ped <- as.data.frame(matrix(NA, ncol = 3, nrow = nrow(ped.log)))
   colnames(ped) <- c('off', 'sire', 'dam')
